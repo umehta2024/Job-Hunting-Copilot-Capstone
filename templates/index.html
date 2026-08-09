@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Job Hunting Copilot</title>
   <style>
     :root {
@@ -23,33 +24,99 @@
     body {
       font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
       max-width: 900px;
-      margin: 48px auto;
+      margin: 0 auto 48px;
       padding: 0 20px;
       color: var(--text);
       background: var(--bg);
     }
 
-    h1 {
-      font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 4px;
+    /* ---------- Top bar / user info ---------- */
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 0 4px;
+      gap: 16px;
+      flex-wrap: wrap;
     }
 
-    .hint {
-      color: var(--muted);
-      font-size: 14px;
-      margin-top: 4px;
-      line-height: 1.6;
+    h1 { font-size: 26px; font-weight: 700; margin: 0; }
+
+    .hint { color: var(--muted); font-size: 14px; margin: 4px 0 0; line-height: 1.6; }
+
+    #user-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 14px 6px 6px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: border-color .15s ease;
     }
+    #user-chip:hover { border-color: var(--accent); }
+    #user-chip .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--accent); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; flex-shrink: 0;
+    }
+    #user-chip .name { font-weight: 600; }
+    #user-chip .sub { color: var(--muted); }
+
+    /* ---------- Stale banner ---------- */
+    #stale-banner {
+      display: none;
+      background: #fffbeb;
+      border: 1px solid var(--warning);
+      color: #92400e;
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-top: 16px;
+      font-size: 13px;
+    }
+    #stale-banner strong { color: #78350f; }
+
+    /* ---------- Tabs ---------- */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      margin-top: 20px;
+      border-bottom: 1px solid var(--border);
+      overflow-x: auto;
+    }
+    .tab-btn {
+      margin: 0;
+      background: none;
+      color: var(--muted);
+      font-weight: 600;
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 8px 8px 0 0;
+      white-space: nowrap;
+    }
+    .tab-btn:hover { background: #ecfdf5; color: var(--accent); }
+    .tab-btn.active {
+      color: var(--accent);
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-bottom: 1px solid var(--card-bg);
+      margin-bottom: -1px;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
 
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 24px;
-      margin-top: 24px;
+      margin-top: 20px;
       box-shadow: 0 1px 3px rgba(16, 24, 40, 0.04);
     }
+    .card h2 { font-size: 16px; font-weight: 600; margin: 0 0 16px; }
 
     label {
       display: block;
@@ -60,16 +127,19 @@
     }
     label:first-child { margin-top: 0; }
 
-    input[type="text"], input[type="number"] {
+    input[type="text"], input[type="number"], input[type="date"], input[type="email"],
+    textarea, select {
       width: 100%;
       padding: 10px 12px;
       margin-top: 6px;
       border: 1px solid var(--border);
       border-radius: 8px;
       font-size: 14px;
+      font-family: inherit;
       transition: border-color 0.15s ease;
     }
-    input[type="text"]:focus, input[type="number"]:focus {
+    textarea { resize: vertical; min-height: 70px; }
+    input:focus, textarea:focus, select:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
@@ -90,6 +160,10 @@
     button:hover { background: var(--accent-hover); }
     button:active { transform: translateY(1px); }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary {
+      background: transparent; color: var(--accent); border: 1px solid var(--accent);
+    }
+    button.secondary:hover { background: var(--accent); color: #fff; }
 
     #result {
       margin-top: 16px;
@@ -110,154 +184,421 @@
       margin-bottom: 16px;
       transition: all 0.2s ease;
     }
-    .job-card:hover {
-      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
-      border-color: var(--accent);
-    }
+    .job-card:hover { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1); border-color: var(--accent); }
 
-    .job-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: start;
-      margin-bottom: 12px;
-    }
+    .job-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 12px; gap: 12px; }
+    .job-title { font-size: 18px; font-weight: 600; color: var(--text); margin: 0 0 8px 0; }
+    .job-company { font-size: 15px; color: var(--accent); font-weight: 500; margin-bottom: 8px; }
+    .job-meta { display: flex; gap: 16px; color: var(--muted); font-size: 13px; margin-top: 8px; flex-wrap: wrap; }
+    .job-description { font-size: 14px; color: var(--text); line-height: 1.6; margin-top: 12px; }
 
-    .job-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text);
-      margin: 0 0 8px 0;
+    .similarity-badge, .salary-badge, .category-badge {
+      padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; white-space: nowrap;
     }
+    .similarity-badge { background: var(--accent); color: white; }
+    .salary-badge { background: #f0fdf4; color: var(--accent); border: 1px solid var(--accent); }
+    .category-badge { background: #f1f5f9; color: var(--muted); border: 1px solid var(--border); }
 
-    .job-company {
-      font-size: 15px;
-      color: var(--accent);
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-
-    .job-meta {
-      display: flex;
-      gap: 16px;
-      color: var(--muted);
-      font-size: 13px;
-      margin-top: 8px;
-    }
-
-    .job-description {
-      font-size: 14px;
-      color: var(--text);
-      line-height: 1.6;
-      margin-top: 12px;
-    }
-
-    .similarity-badge {
-      background: var(--accent);
-      color: white;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .salary-badge {
-      background: #f0fdf4;
-      color: var(--accent);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      border: 1px solid var(--accent);
-    }
-
-    .save-btn {
-      margin-top: 0;
-      padding: 6px 14px;
-      font-size: 13px;
-      background: transparent;
-      color: var(--accent);
-      border: 1px solid var(--accent);
-    }
+    .save-btn { margin-top: 0; padding: 6px 14px; font-size: 13px; background: transparent; color: var(--accent); border: 1px solid var(--accent); }
     .save-btn:hover { background: var(--accent); color: white; }
 
-    .empty-state {
-      text-align: center;
-      padding: 40px 20px;
+    .job-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .job-actions button, .job-actions a button { margin-top: 0; }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--muted); }
+
+    /* ---------- Pipeline ---------- */
+    .pipeline-col-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
       color: var(--muted);
+      margin: 20px 0 8px;
+    }
+    .pipeline-col-title:first-child { margin-top: 0; }
+    .app-row {
+      display: flex; justify-content: space-between; align-items: center;
+      border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; gap: 12px;
+    }
+    .app-row .info { min-width: 0; }
+    .app-row .info .t { font-weight: 600; font-size: 14px; }
+    .app-row .info .c { color: var(--muted); font-size: 12px; }
+    .app-row select { width: auto; margin: 0; padding: 6px 8px; font-size: 12px; }
+    .stale-tag { color: var(--danger); font-size: 11px; font-weight: 700; margin-left: 8px; }
+
+    /* ---------- Contacts / Interviews lists ---------- */
+    .list-row {
+      border: 1px solid var(--border); border-radius: 8px; padding: 14px; margin-bottom: 10px;
+    }
+    .list-row .t { font-weight: 600; font-size: 14px; }
+    .list-row .c { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .list-row .n { font-size: 13px; margin-top: 8px; color: var(--text); }
+
+    .skills-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .skill-tag {
+      background: #f0fdf4; border: 1px solid var(--border); color: var(--text);
+      font-size: 12px; padding: 4px 10px; border-radius: 999px;
     }
 
-    .stats {
-      display: flex;
-      gap: 16px;
-      margin-top: 16px;
-      font-size: 13px;
-      color: var(--muted);
+    /* ---------- Modal (profile edit) ---------- */
+    .modal-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, .45);
+      align-items: center; justify-content: center; padding: 20px; z-index: 50;
     }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: var(--card-bg); border-radius: var(--radius); padding: 24px;
+      max-width: 480px; width: 100%; max-height: 85vh; overflow-y: auto;
+    }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; }
+    .modal-head h2 { margin: 0; }
+    .modal-close { background: none; color: var(--muted); font-size: 20px; padding: 0; margin: 0; line-height: 1; }
+    .modal-close:hover { color: var(--text); background: none; }
   </style>
 </head>
 <body>
-  <h1>💼 Job Hunting Copilot</h1>
-  <p class="hint">Semantic job search powered by vector embeddings. Search for jobs using natural language and find the best matches instantly!</p>
 
-  <div class="card">
-    <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">🔍 Search Jobs</h2>
-    <form id="search-form">
-      <label for="query">What are you looking for?</label>
-      <input type="text" id="query" name="query" placeholder="e.g., Python backend developer with microservices experience" required>
-      
-      <label for="location" style="margin-top: 16px;">Location (optional)</label>
-      <input type="text" id="location" name="location" placeholder="e.g., London, UK">
-      
-      <label for="min_salary" style="margin-top: 16px;">Minimum Salary (optional)</label>
-      <input type="number" id="min_salary" name="min_salary" placeholder="e.g., 70000">
-      
-      <label for="top_k" style="margin-top: 16px;">Number of results</label>
-      <input type="number" id="top_k" name="top_k" value="10" min="1" max="50">
-      
-      <button type="submit">🚀 Search Jobs</button>
-    </form>
-
-    <div id="result"></div>
+  <div class="topbar">
+    <div>
+      <h1>💼 Job Hunting Copilot</h1>
+      <p class="hint">Semantic job search, application tracking, and match explanations in one place.</p>
+    </div>
+    <div id="user-chip" onclick="openProfileModal()">
+      <div class="avatar" id="user-avatar">?</div>
+      <div>
+        <div class="name" id="user-name">Loading…</div>
+        <div class="sub" id="user-sub"></div>
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h2 style="font-size: 16px; font-weight: 600; margin: 0;">📋 Search Results</h2>
-      <button onclick="loadRecentJobs()" style="margin: 0; padding: 6px 12px; font-size: 13px;">View All Jobs</button>
+  <div id="stale-banner"></div>
+
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="search">🔍 Search</button>
+    <button class="tab-btn" data-tab="saved">💾 Saved</button>
+    <button class="tab-btn" data-tab="pipeline">📌 Pipeline</button>
+    <button class="tab-btn" data-tab="interviews">🗒️ Interviews</button>
+    <button class="tab-btn" data-tab="contacts">👥 Contacts</button>
+  </div>
+
+  <!-- ================= SEARCH TAB ================= -->
+  <div class="tab-panel active" id="tab-search">
+    <div class="card">
+      <h2>Search Jobs</h2>
+      <form id="search-form">
+        <label for="query">What are you looking for?</label>
+        <input type="text" id="query" name="query" placeholder="e.g., Python backend developer with microservices experience" required>
+
+        <label for="location">Location (optional)</label>
+        <input type="text" id="location" name="location" placeholder="e.g., London, UK">
+
+        <label for="min_salary">Minimum Salary (optional)</label>
+        <input type="number" id="min_salary" name="min_salary" placeholder="e.g., 70000">
+
+        <label for="category">Category (optional)</label>
+        <input type="text" id="category" name="category" placeholder="e.g., IT Jobs">
+
+        <label for="top_k">Number of results</label>
+        <input type="number" id="top_k" name="top_k" value="10" min="1" max="50">
+
+        <button type="submit">🚀 Search Jobs</button>
+      </form>
+      <div id="result"></div>
     </div>
-    
-    <div id="jobs-list"></div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <h2 style="margin:0;">📋 Results</h2>
+        <button class="secondary" onclick="loadRecentJobs()">View All Jobs</button>
+      </div>
+      <div id="jobs-list"></div>
+    </div>
+  </div>
+
+  <!-- ================= SAVED TAB ================= -->
+  <div class="tab-panel" id="tab-saved">
+    <div class="card">
+      <h2>💾 Saved Jobs</h2>
+      <div id="saved-list"><div class="empty-state">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ================= PIPELINE TAB ================= -->
+  <div class="tab-panel" id="tab-pipeline">
+    <div class="card">
+      <h2>📌 Application Pipeline</h2>
+      <div id="pipeline-list"><div class="empty-state">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ================= INTERVIEWS TAB ================= -->
+  <div class="tab-panel" id="tab-interviews">
+    <div class="card">
+      <h2>Log an Interview</h2>
+      <form id="interview-form">
+        <label for="iv-application">Application</label>
+        <select id="iv-application" required></select>
+
+        <label for="iv-date">Interview date</label>
+        <input type="date" id="iv-date">
+
+        <label for="iv-type">Type</label>
+        <select id="iv-type">
+          <option value="">—</option>
+          <option value="phone">Phone</option>
+          <option value="video">Video</option>
+          <option value="onsite">Onsite</option>
+          <option value="technical">Technical</option>
+          <option value="behavioral">Behavioral</option>
+        </select>
+
+        <label for="iv-interviewer">Interviewer name</label>
+        <input type="text" id="iv-interviewer" placeholder="e.g., Alex Kim">
+
+        <label for="iv-notes">Notes</label>
+        <textarea id="iv-notes" placeholder="What was covered, how it went, follow-ups..."></textarea>
+
+        <button type="submit">Save Interview Note</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>🗒️ Interview History</h2>
+      <div id="interviews-list"><div class="empty-state">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ================= CONTACTS TAB ================= -->
+  <div class="tab-panel" id="tab-contacts">
+    <div class="card">
+      <h2>Add a Contact</h2>
+      <form id="contact-form">
+        <label for="c-name">Name *</label>
+        <input type="text" id="c-name" required>
+
+        <label for="c-company">Company</label>
+        <input type="text" id="c-company">
+
+        <label for="c-title">Title</label>
+        <input type="text" id="c-title">
+
+        <label for="c-email">Email</label>
+        <input type="email" id="c-email">
+
+        <label for="c-linkedin">LinkedIn URL</label>
+        <input type="text" id="c-linkedin">
+
+        <label for="c-notes">Notes</label>
+        <textarea id="c-notes" placeholder="How you met, what they offered to help with..."></textarea>
+
+        <button type="submit">Add Contact</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>👥 Your Network</h2>
+      <label for="contact-search" style="margin-top:0;">Search</label>
+      <input type="text" id="contact-search" placeholder="Search by name or company">
+      <div id="contacts-list" style="margin-top:16px;"><div class="empty-state">Loading…</div></div>
+    </div>
+  </div>
+
+  <!-- ================= PROFILE MODAL ================= -->
+  <div class="modal-backdrop" id="profile-modal">
+    <div class="modal">
+      <div class="modal-head">
+        <h2>Your Profile</h2>
+        <button class="modal-close" onclick="closeProfileModal()">✕</button>
+      </div>
+      <form id="profile-form">
+        <label for="p-name">Full name</label>
+        <input type="text" id="p-name">
+
+        <label for="p-location">Location</label>
+        <input type="text" id="p-location">
+
+        <label for="p-phone">Phone</label>
+        <input type="text" id="p-phone">
+
+        <label for="p-linkedin">LinkedIn URL</label>
+        <input type="text" id="p-linkedin">
+
+        <label for="p-github">GitHub URL</label>
+        <input type="text" id="p-github">
+
+        <label for="p-bio">Bio</label>
+        <textarea id="p-bio"></textarea>
+
+        <label for="p-min-salary">Minimum salary preference</label>
+        <input type="number" id="p-min-salary" placeholder="e.g., 90000">
+
+        <label for="p-remote">
+          <input type="checkbox" id="p-remote" style="width:auto; display:inline-block; margin-right:6px;">
+          Remote only
+        </label>
+
+        <label for="p-skills">Skills (comma-separated: name:level:years)</label>
+        <textarea id="p-skills" placeholder="Python:expert:5, SQL:advanced:4.5"></textarea>
+
+        <button type="submit">Save Profile</button>
+      </form>
+      <div id="profile-result" style="margin-top:12px; font-size:13px; color:var(--muted);"></div>
+    </div>
   </div>
 
   <script>
-    const form = document.getElementById("search-form");
+    const CURRENT_USER_ID = 1; // single-tenant default, matches app.py
+
     const resultEl = document.getElementById("result");
     const jobsListEl = document.getElementById("jobs-list");
 
-    async function searchJobs(query, location, minSalary, topK) {
+    // ---------------- Tabs ----------------
+    document.querySelectorAll(".tab-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+        document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + btn.dataset.tab).classList.add("active");
+
+        if (btn.dataset.tab === "saved") loadSavedJobs();
+        if (btn.dataset.tab === "pipeline") loadPipeline();
+        if (btn.dataset.tab === "interviews") { loadApplicationOptions(); loadInterviews(); }
+        if (btn.dataset.tab === "contacts") loadContacts();
+      });
+    });
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text == null ? "" : String(text);
+      return div.innerHTML;
+    }
+
+    function formatSalary(min, max) {
+      if (!min && !max) return null;
+      if (min && max) return `£${formatNumber(min)} - £${formatNumber(max)}`;
+      if (min) return `£${formatNumber(min)}+`;
+      return `Up to £${formatNumber(max)}`;
+    }
+    function formatNumber(num) { return new Intl.NumberFormat("en-GB").format(num); }
+    function formatDate(dateStr) {
+      if (!dateStr) return "";
+      const date = new Date(dateStr);
+      const diffDays = Math.floor((new Date() - date) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      if (diffDays < 7) return `${diffDays} days ago`;
+      return date.toLocaleDateString("en-GB");
+    }
+
+    // ---------------- User info ----------------
+    async function loadUserInfo() {
+      try {
+        const resp = await fetch(`/profile?user_id=${CURRENT_USER_ID}`);
+        const data = await resp.json();
+        if (!resp.ok) {
+          document.getElementById("user-name").textContent = "Set up profile";
+          document.getElementById("user-sub").textContent = "Click to add your info";
+          document.getElementById("user-avatar").textContent = "?";
+          return;
+        }
+        const name = data.full_name || "Unnamed";
+        document.getElementById("user-name").textContent = name;
+        document.getElementById("user-sub").textContent = data.location || (data.skills || []).length + " skills";
+        document.getElementById("user-avatar").textContent = name.charAt(0).toUpperCase();
+        window._profileCache = data;
+      } catch (err) {
+        document.getElementById("user-name").textContent = "Profile unavailable";
+      }
+    }
+
+    function openProfileModal() {
+      const p = window._profileCache || {};
+      document.getElementById("p-name").value = p.full_name || "";
+      document.getElementById("p-location").value = p.location || "";
+      document.getElementById("p-phone").value = p.phone || "";
+      document.getElementById("p-linkedin").value = p.linkedin_url || "";
+      document.getElementById("p-github").value = p.github_url || "";
+      document.getElementById("p-bio").value = p.bio || "";
+      const prefs = p.preferences || {};
+      document.getElementById("p-min-salary").value = prefs.min_salary || "";
+      document.getElementById("p-remote").checked = !!prefs.remote_only;
+      document.getElementById("p-skills").value = (p.skills || [])
+        .map(s => `${s.skill_name}:${s.proficiency_level || ""}:${s.years_of_experience || ""}`)
+        .join(", ");
+      document.getElementById("profile-modal").classList.add("open");
+    }
+    function closeProfileModal() {
+      document.getElementById("profile-modal").classList.remove("open");
+    }
+
+    document.getElementById("profile-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const skillsRaw = document.getElementById("p-skills").value.trim();
+      const skills = skillsRaw
+        ? skillsRaw.split(",").map(chunk => {
+            const [skill_name, proficiency_level, years] = chunk.split(":").map(s => (s || "").trim());
+            return {
+              skill_name,
+              proficiency_level: proficiency_level || null,
+              years_of_experience: years ? parseFloat(years) : null,
+            };
+          }).filter(s => s.skill_name)
+        : [];
+
+      const body = {
+        user_id: CURRENT_USER_ID,
+        full_name: document.getElementById("p-name").value || null,
+        location: document.getElementById("p-location").value || null,
+        phone: document.getElementById("p-phone").value || null,
+        linkedin_url: document.getElementById("p-linkedin").value || null,
+        github_url: document.getElementById("p-github").value || null,
+        bio: document.getElementById("p-bio").value || null,
+        preferences: {
+          min_salary: document.getElementById("p-min-salary").value
+            ? parseFloat(document.getElementById("p-min-salary").value) : null,
+          remote_only: document.getElementById("p-remote").checked,
+        },
+        skills,
+      };
+
+      const resultBox = document.getElementById("profile-result");
+      resultBox.textContent = "Saving...";
+      try {
+        const resp = await fetch("/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { resultBox.textContent = "❌ " + (data.error || resp.statusText); return; }
+        resultBox.textContent = "✅ Profile saved";
+        await loadUserInfo();
+        setTimeout(closeProfileModal, 600);
+      } catch (err) {
+        resultBox.textContent = "❌ " + err;
+      }
+    });
+
+    // ---------------- Search / job list ----------------
+    async function searchJobs(query, location, minSalary, category, topK) {
       const body = { query, top_k: topK };
       if (location) body.location = location;
       if (minSalary) body.min_salary = parseFloat(minSalary);
-      
+      if (category) body.category = category;
+
       try {
         resultEl.textContent = "🔍 Searching for jobs...";
-        
         const resp = await fetch("/jobs/search", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
         const data = await resp.json();
-        
-        if (!resp.ok) {
-          resultEl.textContent = "❌ Error: " + (data.error || resp.statusText);
-          jobsListEl.innerHTML = "";
-          return;
-        }
-        
+        if (!resp.ok) { resultEl.textContent = "❌ Error: " + (data.error || resp.statusText); jobsListEl.innerHTML = ""; return; }
         resultEl.textContent = `✅ Found ${data.count} job(s) matching "${query}"`;
         displayJobs(data.results);
-        
       } catch (err) {
         resultEl.textContent = "❌ Request failed: " + err;
         jobsListEl.innerHTML = "";
@@ -267,21 +608,13 @@
     async function loadRecentJobs() {
       try {
         resultEl.textContent = "Loading recent jobs...";
-        
         const resp = await fetch("/jobs?limit=10");
         const data = await resp.json();
-        
-        if (!resp.ok) {
-          jobsListEl.innerHTML = `<div class="empty-state">Error loading jobs: ${data.error || resp.statusText}</div>`;
-          resultEl.textContent = "";
-          return;
-        }
-        
+        if (!resp.ok) { jobsListEl.innerHTML = `<div class="empty-state">Error loading jobs: ${escapeHtml(data.error || resp.statusText)}</div>`; resultEl.textContent = ""; return; }
         resultEl.textContent = `📋 Showing ${data.count} recent job(s)`;
         displayJobs(data.jobs);
-        
       } catch (err) {
-        jobsListEl.innerHTML = `<div class="empty-state">Failed to load jobs: ${err}</div>`;
+        jobsListEl.innerHTML = `<div class="empty-state">Failed to load jobs: ${escapeHtml(String(err))}</div>`;
         resultEl.textContent = "";
       }
     }
@@ -291,72 +624,40 @@
         jobsListEl.innerHTML = '<div class="empty-state">No jobs found. Try a different search query or check back later.</div>';
         return;
       }
-      
       let html = "";
       jobs.forEach((job) => {
         const salary = formatSalary(job.salary_min, job.salary_max);
         const similarity = job.similarity ? Math.round(job.similarity * 100) : null;
         const description = (job.description || "").substring(0, 300);
         const showMore = job.description && job.description.length > 300;
-        
+
         html += `
           <div class="job-card">
             <div class="job-header">
-              <div style="flex: 1;">
+              <div style="flex: 1; min-width: 0;">
                 <h3 class="job-title">${escapeHtml(job.title || "Untitled Job")}</h3>
                 <div class="job-company">${escapeHtml(job.company || "Company not listed")}</div>
                 <div class="job-meta">
                   ${job.location ? `<span>📍 ${escapeHtml(job.location)}</span>` : ""}
                   ${salary ? `<span class="salary-badge">💰 ${salary}</span>` : ""}
-                  ${job.created_date ? `<span>📅 ${formatDate(job.created_date)}</span>` : ""}
+                  ${job.category ? `<span class="category-badge">${escapeHtml(job.category)}</span>` : ""}
+                  ${job.posted_date ? `<span>📅 ${formatDate(job.posted_date)}</span>` : ""}
                 </div>
               </div>
               ${similarity ? `<span class="similarity-badge">${similarity}% match</span>` : ""}
             </div>
-            
-            ${description ? `
-              <div class="job-description">
-                ${escapeHtml(description)}${showMore ? "..." : ""}
-              </div>
-            ` : ""}
-            
-            <div style="display: flex; gap: 8px; margin-top: 16px;">
-              ${job.url ? `<a href="${job.url}" target="_blank" style="text-decoration: none;"><button>View Job</button></a>` : ""}
+
+            ${description ? `<div class="job-description">${escapeHtml(description)}${showMore ? "…" : ""}</div>` : ""}
+
+            <div class="job-actions">
+              ${job.url ? `<a href="${job.url}" target="_blank" rel="noopener"><button>View Job</button></a>` : ""}
               <button class="save-btn" onclick="saveJob(${job.job_id})">💾 Save</button>
+              <button class="save-btn" onclick="markApplied(${job.job_id})">✅ Mark Applied</button>
             </div>
           </div>
         `;
       });
-      
       jobsListEl.innerHTML = html;
-    }
-
-    function formatSalary(min, max) {
-      if (!min && !max) return null;
-      if (min && max) return `£${formatNumber(min)} - £${formatNumber(max)}`;
-      if (min) return `£${formatNumber(min)}+`;
-      if (max) return `Up to £${formatNumber(max)}`;
-    }
-
-    function formatNumber(num) {
-      return new Intl.NumberFormat('en-GB').format(num);
-    }
-
-    function formatDate(dateStr) {
-      const date = new Date(dateStr);
-      const now = new Date();
-      const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
-      
-      if (diffDays === 0) return "Today";
-      if (diffDays === 1) return "Yesterday";
-      if (diffDays < 7) return `${diffDays} days ago`;
-      return date.toLocaleDateString('en-GB');
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
     }
 
     async function saveJob(jobId) {
@@ -364,36 +665,267 @@
         const resp = await fetch("/jobs/save", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ job_id: jobId, user_id: 1 }),
+          body: JSON.stringify({ job_id: jobId, user_id: CURRENT_USER_ID }),
         });
         const data = await resp.json();
-        
-        if (resp.ok) {
-          alert("✅ Job saved to favorites!");
-        } else {
-          alert("❌ Failed to save job: " + (data.error || resp.statusText));
-        }
-      } catch (err) {
-        alert("❌ Request failed: " + err);
-      }
+        if (resp.ok) alert("✅ Job saved to favorites!");
+        else alert("❌ Failed to save job: " + (data.error || resp.statusText));
+      } catch (err) { alert("❌ Request failed: " + err); }
     }
 
-    form.addEventListener("submit", async (e) => {
+    async function markApplied(jobId) {
+      try {
+        const resp = await fetch("/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_id: jobId, user_id: CURRENT_USER_ID, status: "applied" }),
+        });
+        const data = await resp.json();
+        if (resp.ok) alert("✅ Marked as applied — check the Pipeline tab.");
+        else alert("❌ Failed: " + (data.error || resp.statusText));
+      } catch (err) { alert("❌ Request failed: " + err); }
+    }
+
+    document.getElementById("search-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const query = document.getElementById("query").value;
       const location = document.getElementById("location").value;
       const minSalary = document.getElementById("min_salary").value;
+      const category = document.getElementById("category").value;
       const topK = parseInt(document.getElementById("top_k").value) || 10;
-      
-      if (!query.trim()) {
-        resultEl.textContent = "Please enter a search query.";
-        return;
-      }
-      
-      await searchJobs(query, location, minSalary, topK);
+      if (!query.trim()) { resultEl.textContent = "Please enter a search query."; return; }
+      await searchJobs(query, location, minSalary, category, topK);
     });
 
-    // Load recent jobs on page load
+    // ---------------- Saved jobs ----------------
+    async function loadSavedJobs() {
+      const el = document.getElementById("saved-list");
+      el.innerHTML = '<div class="empty-state">Loading…</div>';
+      try {
+        const resp = await fetch(`/jobs/saved?user_id=${CURRENT_USER_ID}`);
+        const data = await resp.json();
+        if (!resp.ok) { el.innerHTML = `<div class="empty-state">${escapeHtml(data.error || resp.statusText)}</div>`; return; }
+        if (!data.saved_jobs || data.saved_jobs.length === 0) {
+          el.innerHTML = '<div class="empty-state">No saved jobs yet. Save one from the Search tab.</div>';
+          return;
+        }
+        el.innerHTML = data.saved_jobs.map(job => `
+          <div class="job-card">
+            <div class="job-header">
+              <div style="flex:1; min-width:0;">
+                <h3 class="job-title">${escapeHtml(job.title)}</h3>
+                <div class="job-company">${escapeHtml(job.company || "")}</div>
+                <div class="job-meta">
+                  ${job.location ? `<span>📍 ${escapeHtml(job.location)}</span>` : ""}
+                  ${formatSalary(job.salary_min, job.salary_max) ? `<span class="salary-badge">💰 ${formatSalary(job.salary_min, job.salary_max)}</span>` : ""}
+                </div>
+              </div>
+            </div>
+            ${job.notes ? `<div class="job-description">📝 ${escapeHtml(job.notes)}</div>` : ""}
+            <div class="job-actions">
+              ${job.url ? `<a href="${job.url}" target="_blank" rel="noopener"><button>View Job</button></a>` : ""}
+              <button class="save-btn" onclick="markApplied(${job.job_id})">✅ Mark Applied</button>
+            </div>
+          </div>
+        `).join("");
+      } catch (err) {
+        el.innerHTML = `<div class="empty-state">Failed to load: ${escapeHtml(String(err))}</div>`;
+      }
+    }
+
+    // ---------------- Pipeline ----------------
+    const STATUS_ORDER = ["applied", "interviewing", "offered", "accepted", "rejected", "withdrawn"];
+    const STATUS_LABEL = {
+      applied: "Applied", interviewing: "Interviewing", offered: "Offered",
+      accepted: "Accepted", rejected: "Rejected", withdrawn: "Withdrawn",
+    };
+
+    async function loadPipeline() {
+      const el = document.getElementById("pipeline-list");
+      el.innerHTML = '<div class="empty-state">Loading…</div>';
+      try {
+        const [appsResp, staleResp] = await Promise.all([
+          fetch(`/applications?user_id=${CURRENT_USER_ID}`),
+          fetch(`/applications/stale?user_id=${CURRENT_USER_ID}&days=14`),
+        ]);
+        const appsData = await appsResp.json();
+        const staleData = await staleResp.json();
+
+        renderStaleBanner(staleData.stale_applications || []);
+
+        if (!appsResp.ok) { el.innerHTML = `<div class="empty-state">${escapeHtml(appsData.error || appsResp.statusText)}</div>`; return; }
+        if (!appsData.applications || appsData.applications.length === 0) {
+          el.innerHTML = '<div class="empty-state">No applications tracked yet. Mark a job as applied from Search or Saved.</div>';
+          return;
+        }
+
+        const staleIds = new Set((staleData.stale_applications || []).map(a => a.application_id));
+        let html = "";
+        STATUS_ORDER.forEach(status => {
+          const rows = appsData.applications.filter(a => a.status === status);
+          if (rows.length === 0) return;
+          html += `<div class="pipeline-col-title">${STATUS_LABEL[status]} (${rows.length})</div>`;
+          rows.forEach(a => {
+            html += `
+              <div class="app-row">
+                <div class="info">
+                  <div class="t">${escapeHtml(a.title)}${staleIds.has(a.application_id) ? '<span class="stale-tag">STALE</span>' : ""}</div>
+                  <div class="c">${escapeHtml(a.company || "")} · applied ${formatDate(a.applied_date)}</div>
+                </div>
+                <select onchange="updateStatus(${a.job_id}, this.value)">
+                  ${STATUS_ORDER.map(s => `<option value="${s}" ${s === a.status ? "selected" : ""}>${STATUS_LABEL[s]}</option>`).join("")}
+                </select>
+              </div>
+            `;
+          });
+        });
+        el.innerHTML = html;
+      } catch (err) {
+        el.innerHTML = `<div class="empty-state">Failed to load: ${escapeHtml(String(err))}</div>`;
+      }
+    }
+
+    function renderStaleBanner(staleApps) {
+      const banner = document.getElementById("stale-banner");
+      if (!staleApps.length) { banner.style.display = "none"; return; }
+      banner.style.display = "block";
+      banner.innerHTML = `<strong>⏰ ${staleApps.length} application${staleApps.length > 1 ? "s" : ""}</strong> haven't been updated in 14+ days — ${
+        staleApps.slice(0, 3).map(a => escapeHtml(a.title)).join(", ")
+      }${staleApps.length > 3 ? "…" : ""}. Consider a follow-up.`;
+    }
+
+    async function updateStatus(jobId, status) {
+      try {
+        const resp = await fetch("/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_id: jobId, user_id: CURRENT_USER_ID, status }),
+        });
+        if (!resp.ok) { const data = await resp.json(); alert("❌ " + (data.error || resp.statusText)); }
+        loadPipeline();
+      } catch (err) { alert("❌ Request failed: " + err); }
+    }
+
+    // ---------------- Interviews ----------------
+    async function loadApplicationOptions() {
+      const select = document.getElementById("iv-application");
+      try {
+        const resp = await fetch(`/applications?user_id=${CURRENT_USER_ID}`);
+        const data = await resp.json();
+        if (!resp.ok || !data.applications) { select.innerHTML = "<option value=''>No applications yet</option>"; return; }
+        select.innerHTML = data.applications.map(a =>
+          `<option value="${a.application_id}">${escapeHtml(a.title)} — ${escapeHtml(a.company || "")}</option>`
+        ).join("");
+      } catch (err) {
+        select.innerHTML = "<option value=''>Failed to load applications</option>";
+      }
+    }
+
+    document.getElementById("interview-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const applicationId = document.getElementById("iv-application").value;
+      if (!applicationId) { alert("No application selected."); return; }
+      const body = {
+        application_id: parseInt(applicationId),
+        interview_date: document.getElementById("iv-date").value || null,
+        interview_type: document.getElementById("iv-type").value || null,
+        interviewer_name: document.getElementById("iv-interviewer").value || null,
+        notes: document.getElementById("iv-notes").value || null,
+      };
+      try {
+        const resp = await fetch("/interviews", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { alert("❌ " + (data.error || resp.statusText)); return; }
+        e.target.reset();
+        loadInterviews();
+        alert("✅ Interview note saved");
+      } catch (err) { alert("❌ Request failed: " + err); }
+    });
+
+    async function loadInterviews() {
+      const el = document.getElementById("interviews-list");
+      el.innerHTML = '<div class="empty-state">Loading…</div>';
+      try {
+        const resp = await fetch(`/interviews?user_id=${CURRENT_USER_ID}`);
+        const data = await resp.json();
+        if (!resp.ok) { el.innerHTML = `<div class="empty-state">${escapeHtml(data.error || resp.statusText)}</div>`; return; }
+        if (!data.interviews || data.interviews.length === 0) {
+          el.innerHTML = '<div class="empty-state">No interview notes yet.</div>';
+          return;
+        }
+        el.innerHTML = data.interviews.map(i => `
+          <div class="list-row">
+            <div class="t">${escapeHtml(i.title)} — ${escapeHtml(i.company || "")}</div>
+            <div class="c">${i.interview_type ? escapeHtml(i.interview_type) + " · " : ""}${formatDate(i.interview_date)}${i.interviewer_name ? " · " + escapeHtml(i.interviewer_name) : ""}</div>
+            ${i.notes ? `<div class="n">${escapeHtml(i.notes)}</div>` : ""}
+          </div>
+        `).join("");
+      } catch (err) {
+        el.innerHTML = `<div class="empty-state">Failed to load: ${escapeHtml(String(err))}</div>`;
+      }
+    }
+
+    // ---------------- Contacts ----------------
+    document.getElementById("contact-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const body = {
+        user_id: CURRENT_USER_ID,
+        name: document.getElementById("c-name").value,
+        company: document.getElementById("c-company").value || null,
+        title: document.getElementById("c-title").value || null,
+        email: document.getElementById("c-email").value || null,
+        linkedin_url: document.getElementById("c-linkedin").value || null,
+        notes: document.getElementById("c-notes").value || null,
+      };
+      try {
+        const resp = await fetch("/contacts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (!resp.ok) { alert("❌ " + (data.error || resp.statusText)); return; }
+        e.target.reset();
+        loadContacts();
+      } catch (err) { alert("❌ Request failed: " + err); }
+    });
+
+    let contactSearchTimer = null;
+    document.getElementById("contact-search").addEventListener("input", (e) => {
+      clearTimeout(contactSearchTimer);
+      contactSearchTimer = setTimeout(() => loadContacts(e.target.value), 250);
+    });
+
+    async function loadContacts(q) {
+      const el = document.getElementById("contacts-list");
+      el.innerHTML = '<div class="empty-state">Loading…</div>';
+      try {
+        const url = `/contacts?user_id=${CURRENT_USER_ID}` + (q ? `&q=${encodeURIComponent(q)}` : "");
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (!resp.ok) { el.innerHTML = `<div class="empty-state">${escapeHtml(data.error || resp.statusText)}</div>`; return; }
+        if (!data.contacts || data.contacts.length === 0) {
+          el.innerHTML = '<div class="empty-state">No contacts yet. Add one above.</div>';
+          return;
+        }
+        el.innerHTML = data.contacts.map(c => `
+          <div class="list-row">
+            <div class="t">${escapeHtml(c.name)}${c.title ? " — " + escapeHtml(c.title) : ""}</div>
+            <div class="c">${escapeHtml(c.company || "")}${c.email ? " · " + escapeHtml(c.email) : ""}</div>
+            ${c.notes ? `<div class="n">${escapeHtml(c.notes)}</div>` : ""}
+          </div>
+        `).join("");
+      } catch (err) {
+        el.innerHTML = `<div class="empty-state">Failed to load: ${escapeHtml(String(err))}</div>`;
+      }
+    }
+
+    // ---------------- Init ----------------
+    loadUserInfo();
     loadRecentJobs();
   </script>
 </body>
