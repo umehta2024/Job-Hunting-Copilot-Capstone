@@ -530,7 +530,7 @@ def save_job():
                     """,
                     (user_id, job_id, notes)
                 )
-                saved_job_id = cur.fetchone()[0]
+                saved_job_id = _first_value(cur)
                 conn.commit()
 
         return jsonify({
@@ -675,7 +675,7 @@ def upsert_profile():
                         github_url, portfolio_url, bio, preferences_json,
                     ),
                 )
-                profile_id = cur.fetchone()[0]
+                profile_id = _first_value(cur)
 
                 if skills is not None:
                     cur.execute(
@@ -827,7 +827,7 @@ def upsert_application():
                         """,
                         (user_id, job_id, status, notes),
                     )
-                application_id = cur.fetchone()[0]
+                application_id = _first_value(cur)
                 conn.commit()
 
         rows = lakebase.run_query(
@@ -990,7 +990,7 @@ def log_interview():
                     """,
                     (application_id, interview_date, interview_type, interviewer_name, notes),
                 )
-                note_id = cur.fetchone()[0]
+                note_id = _first_value(cur)
 
                 if app_rows[0]["status"] == "applied":
                     cur.execute(
@@ -1156,7 +1156,7 @@ def create_contact():
                         body.get("linkedin_url"), body.get("notes"),
                     ),
                 )
-                contact_id = cur.fetchone()[0]
+                contact_id = _first_value(cur)
                 conn.commit()
 
         rows = lakebase.run_query(
