@@ -1,8 +1,8 @@
 """
-Databricks Weather Intelligence App:
-- Serves a Flask API
+Databricks Job Hunting Copilot App:
+- Serves a Flask API for job search
 - Reads/writes to Lakebase (Databricks-managed Postgres) via lakebase.py
-- Pulls weather data from the NWS API via weather_client.py and syncs it into Lakebase
+- Provides semantic job search using vector embeddings (NO LLM needed!)
 
 Run locally:
     python app.py
@@ -18,16 +18,16 @@ from flask import Flask, jsonify, render_template, request
 from sentence_transformers import SentenceTransformer
 
 import lakebase
-from weather_client import WeatherClient, geocode_location
 
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("weather-app")
+logger = logging.getLogger("job-hunting-app")
 
 app = Flask(__name__)
 _w = WorkspaceClient()
 
-WEATHER_TABLE_NAME = os.environ.get("WEATHER_TABLE_NAME", "weather_documents")
-EMBEDDINGS_TABLE_NAME = os.environ.get("EMBEDDINGS_TABLE_NAME", "weather_embeddings")
+JOBS_TABLE_NAME = os.environ.get("JOBS_TABLE_NAME", "job_postings")
+EMBEDDINGS_TABLE_NAME = os.environ.get("EMBEDDINGS_TABLE_NAME", "job_embeddings")
+SAVED_JOBS_TABLE_NAME = os.environ.get("SAVED_JOBS_TABLE_NAME", "saved_jobs")
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 # Load embedding model once at module level for semantic search
@@ -36,35 +36,27 @@ _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 logger.info("Embedding model loaded")
 
 
-def ensure_weather_table():
+def ensure_tables():
     """
-    Create the weather documents table in Lakebase if it doesn't exist yet.
-    This is the RAW document store that will later be used to compute
-    vector embeddings.
+    Ensure job hunting tables exist in Lakebase.
+    Job postings and embeddings tables should exist from setup scripts.
     """
+    # Create saved_jobs table if it doesn't exist
     lakebase.run_write(
         f"""
-        CREATE TABLE IF NOT EXISTS {WEATHER_TABLE_NAME} (
-            id TEXT PRIMARY KEY,
-            location TEXT NOT NULL,
-            source_type TEXT NOT NULL,
-            headline TEXT,
-            event TEXT,
-            narrative_text TEXT NOT NULL,
-            issued_at TIMESTAMPTZ,
-            effective_at TIMESTAMPTZ,
-            payload JSONB NOT NULL,
-            synced_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        CREATE TABLE IF NOT EXISTS {SAVED_JOBS_TABLE_NAME} (
+            saved_job_id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL DEFAULT 1,
+            job_id INTEGER NOT NULL REFERENCES {JOBS_TABLE_NAME}(job_id),
+            notes TEXT,
+            saved_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            UNIQUE(user_id, job_id)
         )
         """
     )
     lakebase.run_write(
-        f"CREATE INDEX IF NOT EXISTS idx_{WEATHER_TABLE_NAME}_location "
-        f"ON {WEATHER_TABLE_NAME} (location)"
-    )
-    lakebase.run_write(
-        f"CREATE INDEX IF NOT EXISTS idx_{WEATHER_TABLE_NAME}_source_type "
-        f"ON {WEATHER_TABLE_NAME} (source_type)"
+        f"CREATE INDEX IF NOT EXISTS idx_{SAVED_JOBS_TABLE_NAME}_user "
+        f"ON {SAVED_JOBS_TABLE_NAME} (user_id)"
     )
 
 
@@ -75,8 +67,7 @@ def healthz():
 
 @app.errorhandler(Exception)
 def handle_exception(err):
-    """Ensure all unhandled errors return JSON (not an HTML error page),
-    so the frontend's resp.json() call never chokes on HTML."""
+    """Ensure all unhandled errors return JSON (not an HTML error page)."""
     logger.exception("Unhandled exception while processing request")
     status_code = getattr(err, "code", 500)
     if not isinstance(status_code, int):
@@ -86,16 +77,16 @@ def handle_exception(err):
 
 @app.route("/")
 def index():
-    """Simple UI for the weather intelligence app."""
+    """Simple UI for the job hunting app."""
     return render_template("index.html")
 
 
-@app.route("/weather/documents")
-def list_weather_documents():
-    """Read weather documents already synced into Lakebase."""
-    limit = int(request.args.get("limit", 100))
+@app.route("/jobs")
+def list_jobs():
+    """List all job postings with optional filters."""
+    limit = int(request.args.get("limit", 20))
     location = request.args.get("location")
-    source_type = request.args.get("source_type")
+    min_salary = request.args.get("min_salary")
     
     where_clauses = []
     params = []
@@ -104,183 +95,72 @@ def list_weather_documents():
         where_clauses.append("location ILIKE %s")
         params.append(f"%{location}%")
     
-    if source_type:
-        where_clauses.append("source_type = %s")
-        params.append(source_type)
+    if min_salary:
+        where_clauses.append("(salary_min >= %s OR salary_max >= %s)")
+        params.extend([float(min_salary), float(min_salary)])
     
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     params.append(limit)
     
     rows = lakebase.run_query(
         f"""
-        SELECT id, location, source_type, headline, event, 
-               narrative_text, issued_at, effective_at, synced_at 
-        FROM {WEATHER_TABLE_NAME} 
+        SELECT job_id, title, company, location, 
+               salary_min, salary_max, description, 
+               category, created_date, url
+        FROM {JOBS_TABLE_NAME} 
         {where_sql}
-        ORDER BY issued_at DESC NULLS LAST, synced_at DESC 
+        ORDER BY created_date DESC 
         LIMIT %s
         """,
         tuple(params),
     )
-    return jsonify(rows)
+    return jsonify({"jobs": rows, "count": len(rows)})
 
 
-@app.route("/weather/sync", methods=["POST"])
-def sync_weather():
+@app.route("/jobs/<int:job_id>")
+def get_job(job_id):
+    """Get details for a specific job."""
+    rows = lakebase.run_query(
+        f"""
+        SELECT job_id, title, company, location, 
+               salary_min, salary_max, description, 
+               category, created_date, url
+        FROM {JOBS_TABLE_NAME}
+        WHERE job_id = %s
+        """,
+        (job_id,)
+    )
+    
+    if not rows:
+        return jsonify({"error": "Job not found"}), 404
+    
+    return jsonify(rows[0])
+
+
+@app.route("/jobs/search", methods=["POST"])
+def search_jobs():
     """
-    Pull weather alerts and forecasts from the NWS API and upsert them
-    into the weather_documents table in Lakebase.
-
-    Body (JSON): {"locations": ["Chicago, IL", "Austin, TX"], "limit": 50}
+    Semantic search over job postings using vector embeddings (NO LLM!).
     
-    - locations: List of human-readable location strings
-    - limit: Max number of alerts to fetch per location (default: 50)
-    
-    Returns: {"synced": <count>, "locations": [...], "errors": [...]}
-    """
-    ensure_weather_table()
-    client = WeatherClient()
-
-    body = request.json if request.is_json else {}
-    locations = body.get("locations", [])
-    limit = int(body.get("limit", 50))
-
-    if not locations:
-        return jsonify({"error": "No locations provided"}), 400
-
-    total = 0
-    errors = []
-    processed_locations = []
-
-    for location in locations:
-        if not isinstance(location, str) or not location.strip():
-            continue
-            
-        location = location.strip()
-        logger.info(f"Syncing weather data for: {location}")
-        
-        try:
-            # Geocode the location
-            coords = geocode_location(location)
-            if not coords:
-                error_msg = f"Failed to geocode location: {location}"
-                logger.warning(error_msg)
-                errors.append(error_msg)
-                continue
-            
-            lat, lon = coords
-            logger.info(f"Geocoded {location} to ({lat}, {lon})")
-            
-            # Fetch alerts (state-level, using first 2 chars of location if it looks like a state)
-            alerts = []
-            location_parts = location.split(",")
-            if len(location_parts) >= 2:
-                state_code = location_parts[-1].strip().upper()
-                if len(state_code) == 2:
-                    alerts = client.get_active_alerts(area=state_code, limit=limit)
-                    logger.info(f"Fetched {len(alerts)} alerts for {state_code}")
-            
-            # Fetch forecast
-            forecast_periods = client.get_forecast(lat, lon)
-            logger.info(f"Fetched {len(forecast_periods)} forecast periods for {location}")
-            
-            # Normalize and upsert alerts
-            alert_docs = [
-                client.normalize_alert(alert, location) 
-                for alert in alerts
-            ]
-            if alert_docs:
-                total += _upsert_weather_batch(alert_docs)
-            
-            # Normalize and upsert forecast periods
-            forecast_docs = [
-                client.normalize_forecast_period(period, lat, lon, location)
-                for period in forecast_periods
-            ]
-            if forecast_docs:
-                total += _upsert_weather_batch(forecast_docs)
-            
-            processed_locations.append(location)
-            
-        except Exception as e:
-            error_msg = f"Error processing {location}: {str(e)}"
-            logger.error(error_msg, exc_info=True)
-            errors.append(error_msg)
-    
-    response = {
-        "synced": total,
-        "locations": processed_locations,
+    Body (JSON): {
+        "query": "Python backend developer", 
+        "location": "London",
+        "min_salary": 70000,
+        "top_k": 10
     }
-    if errors:
-        response["errors"] = errors
     
-    return jsonify(response)
-
-
-def _upsert_weather_batch(documents: list[dict]) -> int:
-    """
-    Upsert a batch of weather documents into Lakebase.
+    - query: Natural language search query (required)
+    - location: Location filter (optional)
+    - min_salary: Minimum salary filter (optional)
+    - top_k: Number of results to return (default: 10, max: 50)
     
-    Args:
-        documents: List of normalized weather document dicts
-    
-    Returns:
-        Number of documents upserted
-    """
-    count = 0
-    with lakebase.get_connection() as conn:
-        with conn.cursor() as cur:
-            for doc in documents:
-                cur.execute(
-                    f"""
-                    INSERT INTO {WEATHER_TABLE_NAME} (
-                        id, location, source_type, headline, event,
-                        narrative_text, issued_at, effective_at, payload, synced_at
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, now())
-                    ON CONFLICT (id) DO UPDATE
-                        SET location = EXCLUDED.location,
-                            source_type = EXCLUDED.source_type,
-                            headline = EXCLUDED.headline,
-                            event = EXCLUDED.event,
-                            narrative_text = EXCLUDED.narrative_text,
-                            issued_at = EXCLUDED.issued_at,
-                            effective_at = EXCLUDED.effective_at,
-                            payload = EXCLUDED.payload,
-                            synced_at = EXCLUDED.synced_at
-                    """,
-                    (
-                        doc.get("id"),
-                        doc.get("location"),
-                        doc.get("source_type"),
-                        doc.get("headline"),
-                        doc.get("event"),
-                        doc.get("narrative_text"),
-                        doc.get("issued_at"),
-                        doc.get("effective_at"),
-                        _json.dumps(doc.get("payload", {})),
-                    ),
-                )
-                count += 1
-            conn.commit()
-    return count
-
-
-@app.route("/weather/search", methods=["POST"])
-def search_weather():
-    """
-    Semantic search over weather documents using vector embeddings.
-    
-    Body (JSON): {"query": "risk of flooding near rivers", "top_k": 5}
-    
-    - query: Natural language search query
-    - top_k: Number of results to return (default: 5, clamped to 1-20)
-    
-    Returns: List of matching weather documents with similarity scores
+    Returns: List of matching jobs with similarity scores
     """
     body = request.json if request.is_json else {}
     query = body.get("query", "").strip()
-    top_k = body.get("top_k", 5)
+    location = body.get("location", "").strip() if body.get("location") else None
+    min_salary = body.get("min_salary")
+    top_k = body.get("top_k", 10)
     
     # Validate query
     if not query:
@@ -289,7 +169,7 @@ def search_weather():
     # Clamp top_k to reasonable bounds
     try:
         top_k = int(top_k)
-        top_k = max(1, min(20, top_k))
+        top_k = max(1, min(50, top_k))
     except (ValueError, TypeError):
         return jsonify({"error": "top_k must be an integer"}), 400
     
@@ -301,13 +181,13 @@ def search_weather():
         )
         if not count_result or count_result[0].get("count", 0) == 0:
             return jsonify({
-                "error": "No embeddings found. Please sync weather data and run the embeddings pipeline first.",
+                "error": "No job embeddings found. Please run the embeddings generation script first.",
                 "results": []
             }), 404
     except Exception as e:
         logger.error(f"Error checking embeddings table: {e}")
         return jsonify({
-            "error": "Embeddings table not found. Please run the embeddings pipeline first.",
+            "error": "Embeddings table not found. Please run the embeddings generation script first.",
             "results": []
         }), 404
     
@@ -319,6 +199,27 @@ def search_weather():
         logger.error(f"Error embedding query: {e}")
         return jsonify({"error": f"Failed to embed query: {str(e)}"}), 500
     
+    # Build SQL with filters
+    where_clauses = []
+    params = [query_embedding]
+    
+    if location:
+        where_clauses.append("j.location ILIKE %s")
+        params.append(f"%{location}%")
+    
+    if min_salary:
+        try:
+            min_sal = float(min_salary)
+            where_clauses.append("(j.salary_min >= %s OR j.salary_max >= %s)")
+            params.extend([min_sal, min_sal])
+        except (ValueError, TypeError):
+            pass
+    
+    where_sql = f"AND {' AND '.join(where_clauses)}" if where_clauses else ""
+    
+    # Add embedding for ORDER BY and LIMIT
+    params.extend([query_embedding, top_k])
+    
     # Run cosine similarity search using pgvector
     try:
         embedding_str = '{' + ','.join(str(float(x)) for x in query_embedding) + '}'
@@ -326,33 +227,127 @@ def search_weather():
         results = lakebase.run_query(
             f"""
             SELECT 
-                d.id,
-                d.location,
-                d.source_type,
-                d.headline,
-                d.event,
-                d.narrative_text,
-                e.chunk_text,
-                e.chunk_index,
+                j.job_id,
+                j.title,
+                j.company,
+                j.location,
+                j.salary_min,
+                j.salary_max,
+                j.description,
+                j.category,
+                j.created_date,
+                j.url,
                 1 - (e.embedding <=> %s::vector) AS similarity
             FROM {EMBEDDINGS_TABLE_NAME} e
-            JOIN {WEATHER_TABLE_NAME} d ON d.id = e.document_id
+            JOIN {JOBS_TABLE_NAME} j ON j.job_id = e.job_id
+            WHERE 1=1 {where_sql}
             ORDER BY e.embedding <=> %s::vector
             LIMIT %s
             """,
-            (embedding_str, embedding_str, top_k)
+            tuple(params)
         )
         
         logger.info(f"Found {len(results)} results for query: {query}")
         return jsonify({
             "query": query,
+            "location": location,
+            "min_salary": min_salary,
             "top_k": top_k,
-            "results": results
+            "results": results,
+            "count": len(results)
         })
         
     except Exception as e:
         logger.error(f"Error during semantic search: {e}", exc_info=True)
         return jsonify({"error": f"Search failed: {str(e)}"}), 500
+
+
+@app.route("/jobs/save", methods=["POST"])
+def save_job():
+    """
+    Save a job to user's favorites.
+    
+    Body (JSON): {"job_id": 123, "user_id": 1, "notes": "Interesting position"}
+    
+    Returns: {"saved_job_id": <id>, "message": "Job saved"}
+    """
+    ensure_tables()
+    
+    body = request.json if request.is_json else {}
+    job_id = body.get("job_id")
+    user_id = body.get("user_id", 1)
+    notes = body.get("notes", "")
+    
+    if not job_id:
+        return jsonify({"error": "job_id is required"}), 400
+    
+    try:
+        with lakebase.get_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"""
+                    INSERT INTO {SAVED_JOBS_TABLE_NAME} (user_id, job_id, notes)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (user_id, job_id) 
+                    DO UPDATE SET notes = EXCLUDED.notes, saved_at = now()
+                    RETURNING saved_job_id
+                    """,
+                    (user_id, job_id, notes)
+                )
+                saved_job_id = cur.fetchone()[0]
+                conn.commit()
+        
+        return jsonify({
+            "saved_job_id": saved_job_id,
+            "message": f"Job {job_id} saved to favorites"
+        })
+    
+    except Exception as e:
+        logger.error(f"Error saving job: {e}", exc_info=True)
+        return jsonify({"error": f"Failed to save job: {str(e)}"}), 500
+
+
+@app.route("/jobs/saved")
+def list_saved_jobs():
+    """
+    List saved jobs for a user.
+    
+    Query params: user_id (default: 1)
+    
+    Returns: List of saved jobs with full job details
+    """
+    user_id = request.args.get("user_id", 1)
+    
+    try:
+        rows = lakebase.run_query(
+            f"""
+            SELECT 
+                s.saved_job_id,
+                s.user_id,
+                s.notes,
+                s.saved_at,
+                j.job_id,
+                j.title,
+                j.company,
+                j.location,
+                j.salary_min,
+                j.salary_max,
+                j.description,
+                j.category,
+                j.url
+            FROM {SAVED_JOBS_TABLE_NAME} s
+            JOIN {JOBS_TABLE_NAME} j ON j.job_id = s.job_id
+            WHERE s.user_id = %s
+            ORDER BY s.saved_at DESC
+            """,
+            (user_id,)
+        )
+        
+        return jsonify({"saved_jobs": rows, "count": len(rows)})
+    
+    except Exception as e:
+        logger.error(f"Error fetching saved jobs: {e}", exc_info=True)
+        return jsonify({"error": f"Failed to fetch saved jobs: {str(e)}"}), 500
 
 
 if __name__ == "__main__":

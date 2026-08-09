@@ -1,15 +1,17 @@
+# Job Hunting Copilot - Databricks App Configuration
+
 command:
   - "python"
   - "app.py"
 
 env:
   - name: LAKEBASE_SECRET_SCOPE
-    value: "database"
+    value: "job_hunting"
   - name: LAKEBASE_SECRET_KEY
-    value: "lakebase-url"
-  - name: MASSIVE_API_BASE_URL
-    value: "https://api.massive.com"
-  - name: MASSIVE_SECRET_SCOPE
-    value: "massive"
-  - name: MASSIVE_SECRET_KEY
-    value: "api-key"
+    value: "lakebase_url"
+  - name: JOBS_TABLE_NAME
+    value: "job_postings"
+  - name: EMBEDDINGS_TABLE_NAME
+    value: "job_embeddings"
+  - name: SAVED_JOBS_TABLE_NAME
+    value: "saved_jobs"

@@ -2,18 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Weather Intelligence</title>
+  <title>Job Hunting Copilot</title>
   <style>
     :root {
-      --bg: #f0f9ff;
+      --bg: #f0fdf4;
       --card-bg: #ffffff;
-      --border: #dbeafe;
+      --border: #d1fae5;
       --text: #1e293b;
       --muted: #64748b;
-      --accent: #0ea5e9;
-      --accent-hover: #0284c7;
+      --accent: #10b981;
+      --accent-hover: #059669;
       --success: #10b981;
       --warning: #f59e0b;
+      --danger: #ef4444;
       --radius: 12px;
     }
 
@@ -21,7 +22,7 @@
 
     body {
       font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-      max-width: 640px;
+      max-width: 900px;
       margin: 48px auto;
       padding: 0 20px;
       color: var(--text);
@@ -29,16 +30,16 @@
     }
 
     h1 {
-      font-size: 24px;
+      font-size: 28px;
       font-weight: 700;
       margin-bottom: 4px;
     }
 
     .hint {
       color: var(--muted);
-      font-size: 13px;
+      font-size: 14px;
       margin-top: 4px;
-      line-height: 1.5;
+      line-height: 1.6;
     }
 
     .card {
@@ -59,7 +60,7 @@
     }
     label:first-child { margin-top: 0; }
 
-    input[type="text"] {
+    input[type="text"], input[type="number"] {
       width: 100%;
       padding: 10px 12px;
       margin-top: 6px;
@@ -68,10 +69,10 @@
       font-size: 14px;
       transition: border-color 0.15s ease;
     }
-    input[type="text"]:focus {
+    input[type="text"]:focus, input[type="number"]:focus {
       outline: none;
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.12);
     }
 
     button {
@@ -88,6 +89,7 @@
     }
     button:hover { background: var(--accent-hover); }
     button:active { transform: translateY(1px); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
 
     #result {
       margin-top: 16px;
@@ -101,60 +103,118 @@
     }
     #result:empty { display: none; }
 
-    table {
-      width: 100%;
-      margin-top: 0;
-      border-collapse: collapse;
+    .job-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      transition: all 0.2s ease;
     }
-    th, td {
-      text-align: left;
-      padding: 10px 8px;
-      border-bottom: 1px solid var(--border);
+    .job-card:hover {
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
+      border-color: var(--accent);
+    }
+
+    .job-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: start;
+      margin-bottom: 12px;
+    }
+
+    .job-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 0 0 8px 0;
+    }
+
+    .job-company {
+      font-size: 15px;
+      color: var(--accent);
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .job-meta {
+      display: flex;
+      gap: 16px;
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 8px;
+    }
+
+    .job-description {
       font-size: 14px;
+      color: var(--text);
+      line-height: 1.6;
+      margin-top: 12px;
     }
-    th {
+
+    .similarity-badge {
+      background: var(--accent);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 6px;
       font-size: 12px;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: 0.03em;
       font-weight: 600;
     }
-    tbody tr:hover { background: #fafbfe; }
-    tbody tr:last-child td { border-bottom: none; }
 
-    .empty-row td {
-      color: var(--muted);
-      text-align: center;
-      padding: 20px 8px;
+    .salary-badge {
+      background: #f0fdf4;
+      color: var(--accent);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid var(--accent);
     }
 
-    .delete-btn {
+    .save-btn {
       margin-top: 0;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 600;
+      padding: 6px 14px;
+      font-size: 13px;
       background: transparent;
-      color: var(--danger);
-      border: 1px solid var(--danger);
+      color: var(--accent);
+      border: 1px solid var(--accent);
     }
-    .delete-btn:hover { background: var(--danger); color: #fff; }
-    .delete-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .save-btn:hover { background: var(--accent); color: white; }
+
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: var(--muted);
+    }
+
+    .stats {
+      display: flex;
+      gap: 16px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--muted);
+    }
   </style>
 </head>
 <body>
-  <h1>🌤️ Weather Intelligence</h1>
-  <p class="hint">Fetch weather alerts and forecasts from the National Weather Service API. Data is stored in Lakebase for vector search and analysis.</p>
+  <h1>💼 Job Hunting Copilot</h1>
+  <p class="hint">Semantic job search powered by vector embeddings. Search for jobs using natural language and find the best matches instantly!</p>
 
   <div class="card">
-    <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">Sync Weather Data</h2>
-    <form id="weather-form">
-      <label for="locations">Locations (comma-separated)</label>
-      <input type="text" id="locations" name="locations" placeholder="Chicago, IL, Austin, TX, New York, NY" required>
+    <h2 style="font-size: 16px; font-weight: 600; margin-bottom: 16px;">🔍 Search Jobs</h2>
+    <form id="search-form">
+      <label for="query">What are you looking for?</label>
+      <input type="text" id="query" name="query" placeholder="e.g., Python backend developer with microservices experience" required>
       
-      <label for="limit" style="margin-top: 16px;">Max alerts per location</label>
-      <input type="text" id="limit" name="limit" value="50" placeholder="50">
+      <label for="location" style="margin-top: 16px;">Location (optional)</label>
+      <input type="text" id="location" name="location" placeholder="e.g., London, UK">
       
-      <button type="submit">Sync Weather Data</button>
+      <label for="min_salary" style="margin-top: 16px;">Minimum Salary (optional)</label>
+      <input type="number" id="min_salary" name="min_salary" placeholder="e.g., 70000">
+      
+      <label for="top_k" style="margin-top: 16px;">Number of results</label>
+      <input type="number" id="top_k" name="top_k" value="10" min="1" max="50">
+      
+      <button type="submit">🚀 Search Jobs</button>
     </form>
 
     <div id="result"></div>
@@ -162,122 +222,179 @@
 
   <div class="card">
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h2 style="font-size: 16px; font-weight: 600; margin: 0;">Recent Weather Documents</h2>
-      <button onclick="loadDocuments()" style="margin: 0; padding: 6px 12px; font-size: 13px;">Refresh</button>
+      <h2 style="font-size: 16px; font-weight: 600; margin: 0;">📋 Search Results</h2>
+      <button onclick="loadRecentJobs()" style="margin: 0; padding: 6px 12px; font-size: 13px;">View All Jobs</button>
     </div>
     
-    <div style="margin-bottom: 12px;">
-      <label for="filter-location" style="display: inline-block; margin-right: 12px;">Filter by location:</label>
-      <input type="text" id="filter-location" placeholder="e.g., Chicago" style="width: auto; display: inline-block; padding: 6px 10px;">
-      <select id="filter-type" style="padding: 6px 10px; margin-left: 8px; border: 1px solid var(--border); border-radius: 6px;">
-        <option value="">All types</option>
-        <option value="alert">Alerts</option>
-        <option value="forecast">Forecasts</option>
-      </select>
-      <button onclick="loadDocuments()" style="margin-left: 8px; padding: 6px 12px; font-size: 13px;">Apply</button>
-    </div>
-    
-    <div id="documents-list"></div>
+    <div id="jobs-list"></div>
   </div>
 
   <script>
-    const form = document.getElementById("weather-form");
+    const form = document.getElementById("search-form");
     const resultEl = document.getElementById("result");
-    const documentsListEl = document.getElementById("documents-list");
+    const jobsListEl = document.getElementById("jobs-list");
 
-    async function loadDocuments() {
-      const location = document.getElementById("filter-location").value;
-      const sourceType = document.getElementById("filter-type").value;
-      
-      const params = new URLSearchParams({ limit: "20" });
-      if (location) params.append("location", location);
-      if (sourceType) params.append("source_type", sourceType);
+    async function searchJobs(query, location, minSalary, topK) {
+      const body = { query, top_k: topK };
+      if (location) body.location = location;
+      if (minSalary) body.min_salary = parseFloat(minSalary);
       
       try {
-        const resp = await fetch("/weather/documents?" + params);
+        resultEl.textContent = "🔍 Searching for jobs...";
+        
+        const resp = await fetch("/jobs/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
         const data = await resp.json();
         
         if (!resp.ok) {
-          documentsListEl.innerHTML = `<p style="color: var(--muted); padding: 20px; text-align: center;">Error loading documents: ${data.error || resp.statusText}</p>`;
+          resultEl.textContent = "❌ Error: " + (data.error || resp.statusText);
+          jobsListEl.innerHTML = "";
           return;
         }
         
-        if (!data.length) {
-          documentsListEl.innerHTML = `<p style="color: var(--muted); padding: 20px; text-align: center;">No weather documents found. Sync some data above to get started.</p>`;
-          return;
-        }
+        resultEl.textContent = `✅ Found ${data.count} job(s) matching "${query}"`;
+        displayJobs(data.results);
         
-        let html = "";
-        data.forEach((doc) => {
-          const typeColor = doc.source_type === "alert" ? "#ef4444" : "#0ea5e9";
-          const typeLabel = doc.source_type === "alert" ? "ALERT" : "FORECAST";
-          const issuedAt = doc.issued_at ? new Date(doc.issued_at).toLocaleString() : "-";
-          
-          html += `
-            <div style="border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
-                <div>
-                  <span style="display: inline-block; background: ${typeColor}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 8px;">${typeLabel}</span>
-                  <span style="color: var(--muted); font-size: 13px;">${doc.location}</span>
-                </div>
-                <span style="color: var(--muted); font-size: 12px;">${issuedAt}</span>
-              </div>
-              <h3 style="font-size: 14px; font-weight: 600; margin: 8px 0; color: var(--text);">${doc.event || "Weather Update"}</h3>
-              <p style="font-size: 14px; margin: 4px 0; color: var(--text);">${doc.headline || ""}</p>
-              <p style="font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.5;">${(doc.narrative_text || "").substring(0, 200)}${doc.narrative_text && doc.narrative_text.length > 200 ? "..." : ""}</p>
-            </div>
-          `;
-        });
-        
-        documentsListEl.innerHTML = html;
       } catch (err) {
-        documentsListEl.innerHTML = `<p style="color: var(--muted); padding: 20px; text-align: center;">Failed to load documents: ${err}</p>`;
+        resultEl.textContent = "❌ Request failed: " + err;
+        jobsListEl.innerHTML = "";
+      }
+    }
+
+    async function loadRecentJobs() {
+      try {
+        resultEl.textContent = "Loading recent jobs...";
+        
+        const resp = await fetch("/jobs?limit=10");
+        const data = await resp.json();
+        
+        if (!resp.ok) {
+          jobsListEl.innerHTML = `<div class="empty-state">Error loading jobs: ${data.error || resp.statusText}</div>`;
+          resultEl.textContent = "";
+          return;
+        }
+        
+        resultEl.textContent = `📋 Showing ${data.count} recent job(s)`;
+        displayJobs(data.jobs);
+        
+      } catch (err) {
+        jobsListEl.innerHTML = `<div class="empty-state">Failed to load jobs: ${err}</div>`;
+        resultEl.textContent = "";
+      }
+    }
+
+    function displayJobs(jobs) {
+      if (!jobs || jobs.length === 0) {
+        jobsListEl.innerHTML = '<div class="empty-state">No jobs found. Try a different search query or check back later.</div>';
+        return;
+      }
+      
+      let html = "";
+      jobs.forEach((job) => {
+        const salary = formatSalary(job.salary_min, job.salary_max);
+        const similarity = job.similarity ? Math.round(job.similarity * 100) : null;
+        const description = (job.description || "").substring(0, 300);
+        const showMore = job.description && job.description.length > 300;
+        
+        html += `
+          <div class="job-card">
+            <div class="job-header">
+              <div style="flex: 1;">
+                <h3 class="job-title">${escapeHtml(job.title || "Untitled Job")}</h3>
+                <div class="job-company">${escapeHtml(job.company || "Company not listed")}</div>
+                <div class="job-meta">
+                  ${job.location ? `<span>📍 ${escapeHtml(job.location)}</span>` : ""}
+                  ${salary ? `<span class="salary-badge">💰 ${salary}</span>` : ""}
+                  ${job.created_date ? `<span>📅 ${formatDate(job.created_date)}</span>` : ""}
+                </div>
+              </div>
+              ${similarity ? `<span class="similarity-badge">${similarity}% match</span>` : ""}
+            </div>
+            
+            ${description ? `
+              <div class="job-description">
+                ${escapeHtml(description)}${showMore ? "..." : ""}
+              </div>
+            ` : ""}
+            
+            <div style="display: flex; gap: 8px; margin-top: 16px;">
+              ${job.url ? `<a href="${job.url}" target="_blank" style="text-decoration: none;"><button>View Job</button></a>` : ""}
+              <button class="save-btn" onclick="saveJob(${job.job_id})">💾 Save</button>
+            </div>
+          </div>
+        `;
+      });
+      
+      jobsListEl.innerHTML = html;
+    }
+
+    function formatSalary(min, max) {
+      if (!min && !max) return null;
+      if (min && max) return `£${formatNumber(min)} - £${formatNumber(max)}`;
+      if (min) return `£${formatNumber(min)}+`;
+      if (max) return `Up to £${formatNumber(max)}`;
+    }
+
+    function formatNumber(num) {
+      return new Intl.NumberFormat('en-GB').format(num);
+    }
+
+    function formatDate(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+      
+      if (diffDays === 0) return "Today";
+      if (diffDays === 1) return "Yesterday";
+      if (diffDays < 7) return `${diffDays} days ago`;
+      return date.toLocaleDateString('en-GB');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function saveJob(jobId) {
+      try {
+        const resp = await fetch("/jobs/save", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ job_id: jobId, user_id: 1 }),
+        });
+        const data = await resp.json();
+        
+        if (resp.ok) {
+          alert("✅ Job saved to favorites!");
+        } else {
+          alert("❌ Failed to save job: " + (data.error || resp.statusText));
+        }
+      } catch (err) {
+        alert("❌ Request failed: " + err);
       }
     }
 
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const locationsInput = document.getElementById("locations").value;
-      const limitInput = document.getElementById("limit").value;
+      const query = document.getElementById("query").value;
+      const location = document.getElementById("location").value;
+      const minSalary = document.getElementById("min_salary").value;
+      const topK = parseInt(document.getElementById("top_k").value) || 10;
       
-      const locations = locationsInput.split(",").map(l => l.trim()).filter(l => l);
-      const limit = parseInt(limitInput) || 50;
-      
-      if (!locations.length) {
-        resultEl.textContent = "Please enter at least one location.";
+      if (!query.trim()) {
+        resultEl.textContent = "Please enter a search query.";
         return;
       }
       
-      resultEl.textContent = "Syncing weather data for " + locations.length + " location(s)...";
-
-      try {
-        const resp = await fetch("/weather/sync", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ locations, limit }),
-        });
-        const data = await resp.json();
-        
-        if (!resp.ok) {
-          resultEl.textContent = "Error: " + (data.error || resp.statusText);
-          return;
-        }
-        
-        let message = `✅ Synced ${data.synced} weather document(s) for ${data.locations.length} location(s).`;
-        if (data.errors && data.errors.length > 0) {
-          message += "\n\nErrors:\n" + data.errors.join("\n");
-        }
-        resultEl.textContent = message;
-        
-        // Reload documents after 1 second
-        setTimeout(loadDocuments, 1000);
-      } catch (err) {
-        resultEl.textContent = "Request failed: " + err;
-      }
+      await searchJobs(query, location, minSalary, topK);
     });
 
-    // Load documents on page load
-    loadDocuments();
+    // Load recent jobs on page load
+    loadRecentJobs();
   </script>
 </body>
 </html>
