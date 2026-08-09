@@ -300,6 +300,7 @@ def list_jobs():
     limit = int(request.args.get("limit", 20))
     location = request.args.get("location")
     min_salary = request.args.get("min_salary")
+    category = request.args.get("category")
 
     where_clauses = []
     params = []
@@ -312,17 +313,21 @@ def list_jobs():
         where_clauses.append("(salary_min >= %s OR salary_max >= %s)")
         params.extend([float(min_salary), float(min_salary)])
 
+    if category:
+        where_clauses.append("category ILIKE %s")
+        params.append(f"%{category}%")
+
     where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
     params.append(limit)
 
     rows = lakebase.run_query(
         f"""
-        SELECT job_id, title, company, location, 
-               salary_min, salary_max, description, 
-               category, created_date, url
+        SELECT job_id, adzuna_id, title, company, location, 
+               salary_min, salary_max, description, category,
+               url, posted_date, created_at
         FROM {JOBS_TABLE_NAME} 
         {where_sql}
-        ORDER BY created_date DESC 
+        ORDER BY posted_date DESC 
         LIMIT %s
         """,
         tuple(params),
@@ -335,9 +340,9 @@ def get_job(job_id):
     """Get details for a specific job."""
     rows = lakebase.run_query(
         f"""
-        SELECT job_id, title, company, location, 
-               salary_min, salary_max, description, 
-               category, created_date, url
+        SELECT job_id, adzuna_id, title, company, location, 
+               salary_min, salary_max, description, category,
+               url, posted_date, created_at
         FROM {JOBS_TABLE_NAME}
         WHERE job_id = %s
         """,
@@ -365,6 +370,7 @@ def search_jobs():
     - query: Natural language search query (required)
     - location: Location filter (optional)
     - min_salary: Minimum salary filter (optional)
+    - category: Job category filter (optional)
     - top_k: Number of results to return (default: 10, max: 50)
     
     Returns: List of matching jobs with similarity scores
@@ -373,6 +379,7 @@ def search_jobs():
     query = body.get("query", "").strip()
     location = body.get("location", "").strip() if body.get("location") else None
     min_salary = body.get("min_salary")
+    category = body.get("category", "").strip() if body.get("category") else None
     top_k = body.get("top_k", 10)
 
     # Validate query
@@ -428,6 +435,10 @@ def search_jobs():
         except (ValueError, TypeError):
             pass
 
+    if category:
+        where_clauses.append("j.category ILIKE %s")
+        params.append(f"%{category}%")
+
     where_sql = f"AND {' AND '.join(where_clauses)}" if where_clauses else ""
 
     # Add embedding for ORDER BY and LIMIT
@@ -441,6 +452,7 @@ def search_jobs():
             f"""
             SELECT 
                 j.job_id,
+                j.adzuna_id,
                 j.title,
                 j.company,
                 j.location,
@@ -448,8 +460,9 @@ def search_jobs():
                 j.salary_max,
                 j.description,
                 j.category,
-                j.created_date,
                 j.url,
+                j.posted_date,
+                j.created_at,
                 1 - (e.embedding <=> %s::vector) AS similarity
             FROM {EMBEDDINGS_TABLE_NAME} e
             JOIN {JOBS_TABLE_NAME} j ON j.job_id = e.job_id
@@ -465,6 +478,7 @@ def search_jobs():
             "query": query,
             "location": location,
             "min_salary": min_salary,
+            "category": category,
             "top_k": top_k,
             "results": results,
             "count": len(results)
@@ -547,7 +561,8 @@ def list_saved_jobs():
                 j.salary_max,
                 j.description,
                 j.category,
-                j.url
+                j.url,
+                j.posted_date
             FROM {SAVED_JOBS_TABLE_NAME} s
             JOIN {JOBS_TABLE_NAME} j ON j.job_id = s.job_id
             WHERE s.user_id = %s
