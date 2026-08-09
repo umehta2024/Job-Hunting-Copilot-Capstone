@@ -7,6 +7,7 @@ pointing at a native Postgres role with a static, non-expiring password.
 This keeps setup to a single secret instead of five separate env vars.
 """
 
+import base64
 import os
 from contextlib import contextmanager
 
@@ -22,10 +23,18 @@ _KEY = os.environ.get("LAKEBASE_SECRET_KEY", "lakebase_url")
 
 
 def _lakebase_url() -> str:
-    """Fetch the Lakebase connection URL from the Databricks secret scope."""
+    """Fetch the Lakebase connection URL from the Databricks secret scope.
+
+    The Databricks Secrets API always returns secret values base64-encoded
+    (regardless of how the secret was originally stored), so this decodes
+    before handing the DSN to psycopg2/SQLAlchemy.
+    """
     secret = _w.secrets.get_secret(scope=_SCOPE, key=_KEY)
-    # Secret is stored as plain text, no need to decode
-    return secret.value
+    try:
+        return base64.b64decode(secret.value).decode("utf-8")
+    except (ValueError, TypeError):
+        # Already-decoded value (e.g. secret set some other way) -- use as-is
+        return secret.value
 
 
 @contextmanager
