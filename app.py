@@ -14,6 +14,7 @@ import json as _json
 import logging
 import os
 
+import psycopg2.errors
 from databricks.sdk import WorkspaceClient
 from flask import Flask, jsonify, render_template, request
 from sentence_transformers import SentenceTransformer
@@ -54,16 +55,43 @@ _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 logger.info("Embedding model loaded")
 
 
+def _safe_ddl(sql: str, description: str, params: tuple | None = None) -> None:
+    """
+    Run a DDL/setup statement, tolerating privilege errors on objects the
+    app's Lakebase role doesn't own -- e.g. tables created earlier by a
+    different role via a manual migration script. `CREATE ... IF NOT EXISTS`
+    already makes this idempotent for objects we DO own; for ones we don't,
+    the best we can do at startup is skip and log rather than crash the app,
+    since the object presumably already exists in a usable form.
+    """
+    try:
+        lakebase.run_write(sql, params)
+    except psycopg2.errors.InsufficientPrivilege as e:
+        logger.warning(
+            f"Skipping setup step '{description}' -- insufficient privilege "
+            f"(object likely owned by a different role): {e}"
+        )
+    except Exception as e:
+        logger.warning(f"Skipping setup step '{description}' -- unexpected error: {e}")
+
+
 def ensure_tables():
     """
     Ensure job hunting tables exist in Lakebase.
     job_postings / job_embeddings should exist from setup scripts.
     Everything else (including a minimal `users` row for the default
     single-user flow) is created here so the app works on a fresh DB.
+
+    Every statement goes through _safe_ddl: if a table already exists but
+    is owned by a different Postgres role than the app connects as (common
+    when the schema was first created via a manual migration script under
+    an admin role), CREATE INDEX / ALTER-style follow-ups on it would raise
+    InsufficientPrivilege and crash startup. We log and continue instead --
+    the table itself is still usable for normal INSERT/SELECT/UPDATE.
     """
     # Minimal users table -- this app operates single-tenant (user_id=1)
     # by default, but keeps the FK relationships from the full schema.
-    lakebase.run_write(
+    _safe_ddl(
         """
         CREATE TABLE IF NOT EXISTS users (
             user_id SERIAL PRIMARY KEY,
@@ -73,18 +101,20 @@ def ensure_tables():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-        """
+        """,
+        "create users table",
     )
     # Ensure a default user row exists for user_id=1
-    lakebase.run_write(
+    _safe_ddl(
         """
         INSERT INTO users (user_id, email, password_hash)
         VALUES (1, 'default@local', '')
         ON CONFLICT (user_id) DO NOTHING
-        """
+        """,
+        "seed default user",
     )
 
-    lakebase.run_write(
+    _safe_ddl(
         f"""
         CREATE TABLE IF NOT EXISTS {PROFILES_TABLE_NAME} (
             profile_id SERIAL PRIMARY KEY,
@@ -100,14 +130,16 @@ def ensure_tables():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-        """
+        """,
+        f"create {PROFILES_TABLE_NAME} table",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{PROFILES_TABLE_NAME}_user_id "
-        f"ON {PROFILES_TABLE_NAME} (user_id)"
+        f"ON {PROFILES_TABLE_NAME} (user_id)",
+        f"index {PROFILES_TABLE_NAME}.user_id",
     )
 
-    lakebase.run_write(
+    _safe_ddl(
         f"""
         CREATE TABLE IF NOT EXISTS {SKILLS_TABLE_NAME} (
             skill_id SERIAL PRIMARY KEY,
@@ -120,14 +152,16 @@ def ensure_tables():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, skill_name)
         )
-        """
+        """,
+        f"create {SKILLS_TABLE_NAME} table",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{SKILLS_TABLE_NAME}_user_id "
-        f"ON {SKILLS_TABLE_NAME} (user_id)"
+        f"ON {SKILLS_TABLE_NAME} (user_id)",
+        f"index {SKILLS_TABLE_NAME}.user_id",
     )
 
-    lakebase.run_write(
+    _safe_ddl(
         f"""
         CREATE TABLE IF NOT EXISTS {APPLICATIONS_TABLE_NAME} (
             application_id SERIAL PRIMARY KEY,
@@ -142,22 +176,26 @@ def ensure_tables():
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(user_id, job_id)
         )
-        """
+        """,
+        f"create {APPLICATIONS_TABLE_NAME} table",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{APPLICATIONS_TABLE_NAME}_user_id "
-        f"ON {APPLICATIONS_TABLE_NAME} (user_id)"
+        f"ON {APPLICATIONS_TABLE_NAME} (user_id)",
+        f"index {APPLICATIONS_TABLE_NAME}.user_id",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{APPLICATIONS_TABLE_NAME}_status "
-        f"ON {APPLICATIONS_TABLE_NAME} (status)"
+        f"ON {APPLICATIONS_TABLE_NAME} (status)",
+        f"index {APPLICATIONS_TABLE_NAME}.status",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{APPLICATIONS_TABLE_NAME}_applied_date "
-        f"ON {APPLICATIONS_TABLE_NAME} (applied_date)"
+        f"ON {APPLICATIONS_TABLE_NAME} (applied_date)",
+        f"index {APPLICATIONS_TABLE_NAME}.applied_date",
     )
 
-    lakebase.run_write(
+    _safe_ddl(
         f"""
         CREATE TABLE IF NOT EXISTS {INTERVIEW_NOTES_TABLE_NAME} (
             note_id SERIAL PRIMARY KEY,
@@ -171,18 +209,21 @@ def ensure_tables():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-        """
+        """,
+        f"create {INTERVIEW_NOTES_TABLE_NAME} table",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{INTERVIEW_NOTES_TABLE_NAME}_application_id "
-        f"ON {INTERVIEW_NOTES_TABLE_NAME} (application_id)"
+        f"ON {INTERVIEW_NOTES_TABLE_NAME} (application_id)",
+        f"index {INTERVIEW_NOTES_TABLE_NAME}.application_id",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{INTERVIEW_NOTES_TABLE_NAME}_date "
-        f"ON {INTERVIEW_NOTES_TABLE_NAME} (interview_date)"
+        f"ON {INTERVIEW_NOTES_TABLE_NAME} (interview_date)",
+        f"index {INTERVIEW_NOTES_TABLE_NAME}.interview_date",
     )
 
-    lakebase.run_write(
+    _safe_ddl(
         f"""
         CREATE TABLE IF NOT EXISTS {CONTACTS_TABLE_NAME} (
             contact_id SERIAL PRIMARY KEY,
@@ -197,19 +238,22 @@ def ensure_tables():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
-        """
+        """,
+        f"create {CONTACTS_TABLE_NAME} table",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{CONTACTS_TABLE_NAME}_user_id "
-        f"ON {CONTACTS_TABLE_NAME} (user_id)"
+        f"ON {CONTACTS_TABLE_NAME} (user_id)",
+        f"index {CONTACTS_TABLE_NAME}.user_id",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{CONTACTS_TABLE_NAME}_company "
-        f"ON {CONTACTS_TABLE_NAME} (company)"
+        f"ON {CONTACTS_TABLE_NAME} (company)",
+        f"index {CONTACTS_TABLE_NAME}.company",
     )
 
     # Create saved_jobs table if it doesn't exist
-    lakebase.run_write(
+    _safe_ddl(
         f"""
         CREATE TABLE IF NOT EXISTS {SAVED_JOBS_TABLE_NAME} (
             saved_job_id SERIAL PRIMARY KEY,
@@ -219,11 +263,13 @@ def ensure_tables():
             saved_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             UNIQUE(user_id, job_id)
         )
-        """
+        """,
+        f"create {SAVED_JOBS_TABLE_NAME} table",
     )
-    lakebase.run_write(
+    _safe_ddl(
         f"CREATE INDEX IF NOT EXISTS idx_{SAVED_JOBS_TABLE_NAME}_user "
-        f"ON {SAVED_JOBS_TABLE_NAME} (user_id)"
+        f"ON {SAVED_JOBS_TABLE_NAME} (user_id)",
+        f"index {SAVED_JOBS_TABLE_NAME}.user_id",
     )
 
 
