@@ -55,6 +55,15 @@ _embedding_model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 logger.info("Embedding model loaded")
 
 
+def _first_value(cur):
+    """Grab the single RETURNING value from a cursor row, whether the
+    connection uses a tuple cursor or a dict-style (e.g. RealDictCursor)."""
+    row = cur.fetchone()
+    if row is None:
+        raise ValueError("Insert did not return a row")
+    return row[0] if not isinstance(row, dict) else next(iter(row.values()))
+
+
 def _safe_ddl(sql: str, description: str, params: tuple | None = None) -> None:
     """
     Run a DDL/setup statement, tolerating privilege errors on objects the
