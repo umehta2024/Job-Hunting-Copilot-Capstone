@@ -33,11 +33,14 @@ python 02_generate_embeddings.py
 # Stores in job_embeddings table with pgvector
 ```
 
-### **Step 3: Run the Flask App**
+### **Step 3: Deploy the MCP Server**
 ```bash
-python app.py
-# App runs at http://localhost:8080
-# Open browser and start searching!
+# As a Databricks App (recommended)
+databricks apps create job-hunting-mcp --source-code-path ./Job-Hunting-Copilot-Capstone
+
+# Or run locally for testing
+python mcp_server/job_mcp_server.py
+# Server runs at http://localhost:8000
 ```
 
 ## 🔍 API Endpoints
@@ -349,11 +352,12 @@ Job-Hunting-Copilot-Capstone/
 ## 📈 Future Enhancements
 
 - [ ] Add more job sources (LinkedIn, Indeed, etc.)
-- [ ] User authentication
-- [ ] Job alerts/notifications
-- [ ] Application tracking
-- [ ] Resume matching
+- [ ] Multi-user authentication and profiles
+- [ ] Job alerts/notifications via email or Slack
+- [ ] Resume parsing and matching
 - [ ] Interview scheduler integration
+- [ ] Analytics dashboard for application tracking
+- [ ] Chrome extension for one-click job saves
 
 ---
 

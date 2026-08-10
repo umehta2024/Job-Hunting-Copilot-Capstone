@@ -4,7 +4,7 @@
 
 command:
   - "python"
-  - "job_mcp_server.py"
+  - "mcp_server/job_mcp_server.py"
 
 # Dependencies
 env:
