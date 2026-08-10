@@ -364,6 +364,23 @@ def get_job(job_id):
     return jsonify(rows[0])
 
 
+def _get_user_preferences(user_id: int) -> dict:
+    """
+    Fetch and parse user's stored preferences from their profile.
+    Returns empty dict if no profile found or preferences are empty.
+    """
+    try:
+        profile_rows = lakebase.run_query(
+            f"SELECT preferences FROM {PROFILES_TABLE_NAME} WHERE user_id = %s",
+            (user_id,),
+        )
+        if profile_rows and profile_rows[0].get("preferences"):
+            return profile_rows[0]["preferences"]
+    except Exception as e:
+        logger.warning(f"Error fetching user preferences for user_id={user_id}: {e}")
+    return {}
+
+
 @app.route("/jobs/search", methods=["POST"])
 def search_jobs():
     """
@@ -371,24 +388,51 @@ def search_jobs():
     
     Body (JSON): {
         "query": "Python backend developer", 
-        "location": "London",
-        "min_salary": 70000,
+        "user_id": 1,           # optional - if provided, applies stored preferences
+        "location": "London",  # optional - overrides user preference if provided
+        "min_salary": 70000,   # optional - overrides user preference if provided
+        "category": "Backend", # optional - overrides user preference if provided
         "top_k": 10
     }
     
     - query: Natural language search query (required)
-    - location: Location filter (optional)
-    - min_salary: Minimum salary filter (optional)
-    - category: Job category filter (optional)
+    - user_id: User ID to apply stored preferences (optional)
+    - location: Location filter (optional, overrides profile preference)
+    - min_salary: Minimum salary filter (optional, overrides profile preference)
+    - category: Job category filter (optional, overrides profile preference)
+    - remote_only: Remote-only filter (optional, overrides profile preference)
     - top_k: Number of results to return (default: 10, max: 50)
+    
+    Preference priority: Manual filters > Profile preferences > No filter
     
     Returns: List of matching jobs with similarity scores
     """
     body = request.json if request.is_json else {}
     query = body.get("query", "").strip()
-    location = body.get("location", "").strip() if body.get("location") else None
-    min_salary = body.get("min_salary")
-    category = body.get("category", "").strip() if body.get("category") else None
+    user_id = body.get("user_id")
+    
+    # Fetch stored preferences if user_id provided
+    preferences = _get_user_preferences(user_id) if user_id else {}
+    
+    # Manual filters override profile preferences (if explicitly provided)
+    # Use manual filter if present in body, else fall back to preference, else None
+    location = (
+        body.get("location", "").strip() if "location" in body and body.get("location")
+        else preferences.get("preferred_location")
+    )
+    min_salary = (
+        body.get("min_salary") if "min_salary" in body
+        else preferences.get("min_salary")
+    )
+    category = (
+        body.get("category", "").strip() if "category" in body and body.get("category")
+        else preferences.get("preferred_category")
+    )
+    remote_only = (
+        body.get("remote_only") if "remote_only" in body
+        else preferences.get("remote_only")
+    )
+    
     top_k = body.get("top_k", 10)
 
     # Validate query

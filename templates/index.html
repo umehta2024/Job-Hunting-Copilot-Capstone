@@ -302,6 +302,11 @@
 
         <label for="top_k">Number of results</label>
         <input type="number" id="top_k" name="top_k" value="10" min="1" max="50">
+        
+        <label style="display: flex; align-items: center; gap: 8px; margin-top: 16px; cursor: pointer;">
+          <input type="checkbox" id="use_preferences" name="use_preferences" checked style="width: auto; margin: 0;">
+          <span>Apply my profile preferences (overridden by manual filters)</span>
+        </label>
 
         <button type="submit">🚀 Search Jobs</button>
       </form>
@@ -430,8 +435,16 @@
 
         <label for="p-bio">Bio</label>
         <textarea id="p-bio"></textarea>
+        
+        <h3 style="font-size: 14px; margin: 20px 0 8px; color: var(--muted);">Job Search Preferences</h3>
 
-        <label for="p-min-salary">Minimum salary preference</label>
+        <label for="p-preferred-location">Preferred location</label>
+        <input type="text" id="p-preferred-location" placeholder="e.g., London, Remote">
+        
+        <label for="p-preferred-category">Preferred category</label>
+        <input type="text" id="p-preferred-category" placeholder="e.g., IT Jobs, Engineering">
+
+        <label for="p-min-salary">Minimum salary</label>
         <input type="number" id="p-min-salary" placeholder="e.g., 90000">
 
         <label for="p-remote">
