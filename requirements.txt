@@ -1,8 +1,17 @@
-databricks-sdk>=0.30.0
-databricks-sql-connector>=3.4.0
+# Job Hunting MCP Server Dependencies
+
+# FastMCP framework (includes HTTP transport)
+fastmcp>=0.2.0
+
+# Database
 psycopg2-binary>=2.9.9
-sqlalchemy>=2.0.30
-flask>=3.0.3
-requests>=2.32.3
-python-dotenv>=1.0.1
+
+# Embeddings
 sentence-transformers>=2.2.0
+
+# Databricks SDK
+databricks-sdk>=0.30.0
+
+# Web server (included with FastMCP but explicit for clarity)
+starlette>=0.27.0
+uvicorn>=0.23.0

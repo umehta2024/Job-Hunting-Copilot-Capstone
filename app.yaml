@@ -1,17 +1,18 @@
-# Job Hunting Copilot - Databricks App Configuration
+# Databricks App configuration for Job Hunting MCP Server
+# Deploy with: databricks apps create job-hunting-mcp
+# Or via UI: Create App → Upload this folder
 
 command:
   - "python"
-  - "app.py"
+  - "job_mcp_server.py"
 
+# Dependencies
 env:
-  - name: LAKEBASE_SECRET_SCOPE
-    value: "job_hunting"
-  - name: LAKEBASE_SECRET_KEY
-    value: "lakebase_url"
-  - name: JOBS_TABLE_NAME
-    value: "job_postings"
-  - name: EMBEDDINGS_TABLE_NAME
-    value: "job_embeddings"
-  - name: SAVED_JOBS_TABLE_NAME
-    value: "saved_jobs"
+  # Port will be set by Databricks Apps automatically
+  - name: DATABRICKS_APP_PORT
+    value: "8000"
+
+# Resources (optional - adjust based on workload)
+# resources:
+#   cpu: "1"
+#   memory: "4Gi"
