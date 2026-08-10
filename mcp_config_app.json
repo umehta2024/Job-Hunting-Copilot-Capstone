@@ -1,9 +1,0 @@
-{
-  "mcpServers": {
-    "job-hunting": {
-      "url": "https://your-databricks-workspace.cloud.databricks.com/apps/job-hunting-mcp",
-      "transport": "http",
-      "description": "Job hunting MCP server (Databricks App)"
-    }
-  }
-}
