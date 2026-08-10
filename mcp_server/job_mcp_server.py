@@ -152,7 +152,7 @@ def get_job_details(job_id: int) -> dict:
         job_id: The job ID to retrieve
     
     Returns:
-        Dict with full job details including description, salary, requirements.
+        Dict with full job details including description, salary, and url.
     """
     try:
         conn = psycopg2.connect(lakebase_url)
@@ -160,8 +160,7 @@ def get_job_details(job_id: int) -> dict:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute("""
                     SELECT job_id, title, company, location, description,
-                           salary_min, salary_max, contract_type, url,
-                           posted_date, created_at
+                           salary_min, salary_max, url, posted_date, created_at
                     FROM job_postings WHERE job_id = %s
                 """, (job_id,))
                 result = cursor.fetchone()
@@ -197,8 +196,7 @@ def save_job(job_id: int, notes: str = "") -> dict:
                     INSERT INTO saved_jobs (user_id, job_id, notes)
                     VALUES (%s, %s, %s)
                     ON CONFLICT (user_id, job_id) DO UPDATE SET
-                        notes = EXCLUDED.notes,
-                        updated_at = CURRENT_TIMESTAMP
+                        notes = EXCLUDED.notes
                     RETURNING saved_job_id, created_at
                 """, (user_id, job_id, notes or None))
                 conn.commit()

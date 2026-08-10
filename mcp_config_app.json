@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "job-hunting": {
+      "url": "https://dbc-ce1e90bc-dd1f.cloud.databricks.com/apps/job-hunting-copilot",
+      "transport": "http"
+    }
+  }
+}
