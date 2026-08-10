@@ -178,14 +178,14 @@ print("This will fetch Python developer jobs from Adzuna and load them into Lake
 
 # Import and run the pipeline
 import sys
-sys.path.append('/Workspace/Users/upasana.mehta04@gmail.com/Job-Hunting-Copilot-Capstone')
+sys.path.append('/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone')
 
 from importlib import reload
 import importlib.util
 
 spec = importlib.util.spec_from_file_location(
     "ingest_jobs",
-    "/Workspace/Users/upasana.mehta04@gmail.com/Job-Hunting-Copilot-Capstone/01_ingest_jobs.py"
+    "/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone/01_ingest_jobs.py"
 )
 ingest_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ingest_module)

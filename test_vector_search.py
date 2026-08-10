@@ -44,7 +44,7 @@
 # Pure Python + pgvector
 
 import sys
-sys.path.append('/Workspace/Users/upasana.mehta04@gmail.com/Job-Hunting-Copilot-Capstone')
+sys.path.append('/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone')
 
 import psycopg2
 from psycopg2.extras import RealDictCursor

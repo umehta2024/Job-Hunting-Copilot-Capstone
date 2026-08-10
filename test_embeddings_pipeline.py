@@ -113,7 +113,7 @@ except Exception as e:
 # DBTITLE 1,Step 3: Run Embeddings Generation
 # Step 3: Run the embeddings generation pipeline
 import sys
-sys.path.append('/Workspace/Users/upasana.mehta04@gmail.com/Job-Hunting-Copilot-Capstone')
+sys.path.append('/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone')
 
 print("Running embeddings generation pipeline...\n")
 print("This will:")
@@ -129,7 +129,7 @@ import importlib.util
 
 spec = importlib.util.spec_from_file_location(
     "generate_embeddings",
-    "/Workspace/Users/upasana.mehta04@gmail.com/Job-Hunting-Copilot-Capstone/02_generate_embeddings.py"
+    "/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone/02_generate_embeddings.py"
 )
 embed_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(embed_module)
