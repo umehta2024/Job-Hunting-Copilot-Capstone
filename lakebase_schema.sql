@@ -4,11 +4,15 @@
 -- PostgreSQL schema for job hunting application
 -- Run this script against your Lakebase database
 
+-- Enable pgvector extension (required for embeddings)
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Drop existing tables (in reverse order to handle foreign keys)
 DROP TABLE IF EXISTS interview_notes CASCADE;
 DROP TABLE IF EXISTS contacts CASCADE;
 DROP TABLE IF EXISTS saved_jobs CASCADE;
 DROP TABLE IF EXISTS applications CASCADE;
+DROP TABLE IF EXISTS job_embeddings CASCADE;
 DROP TABLE IF EXISTS skills CASCADE;
 DROP TABLE IF EXISTS job_postings CASCADE;
 DROP TABLE IF EXISTS profiles CASCADE;
@@ -63,6 +67,17 @@ CREATE TABLE skills (
 
 CREATE INDEX idx_skills_user_id ON skills(user_id);
 CREATE INDEX idx_skills_name ON skills(skill_name);
+
+-- Add unique constraint for ON CONFLICT upsert in POST /profile
+DO $
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'skills_user_id_skill_name_key'
+    ) THEN
+        ALTER TABLE skills
+            ADD CONSTRAINT skills_user_id_skill_name_key UNIQUE (user_id, skill_name);
+    END IF;
+END $;
 
 -- ============================================
 -- 4. JOB_POSTINGS TABLE
@@ -168,20 +183,37 @@ CREATE INDEX idx_contacts_company ON contacts(company);
 -- SAMPLE DATA (Optional - for testing)
 -- ============================================
 
--- Insert a test user
-INSERT INTO users (email, password_hash) 
-VALUES ('test@example.com', 'hashed_password_here');
+-- Insert test user with user_id = 1 (with all permissions - active user)
+INSERT INTO users (user_id, email, password_hash, is_active) 
+VALUES (1, 'test@example.com', 'hashed_password_here', true)
+ON CONFLICT (user_id) DO NOTHING;
 
--- Insert a test profile
-INSERT INTO profiles (user_id, full_name, location, bio)
-VALUES (1, 'Test User', 'San Francisco, CA', 'Software Engineer looking for opportunities');
+-- Reset sequence to continue from user_id = 2 if needed
+SELECT setval('users_user_id_seq', (SELECT MAX(user_id) FROM users));
+
+-- Insert test profile with preferences
+INSERT INTO profiles (user_id, full_name, location, phone, linkedin_url, github_url, bio, preferences)
+VALUES (
+    1, 
+    'Test User', 
+    'San Francisco, CA',
+    '555-123-4567',
+    'https://linkedin.com/in/testuser',
+    'https://github.com/testuser',
+    'Software Engineer with 5 years of experience looking for Python/ML opportunities',
+    '{"preferred_location": "San Francisco", "preferred_category": "IT Jobs", "min_salary": 90000, "remote_only": false}'::jsonb
+)
+ON CONFLICT (user_id) DO NOTHING;
 
 -- Insert test skills
 INSERT INTO skills (user_id, skill_name, proficiency_level, years_of_experience)
 VALUES 
-    (1, 'Python', 'advanced', 5.0),
+    (1, 'Python', 'expert', 5.0),
     (1, 'SQL', 'advanced', 4.5),
-    (1, 'Machine Learning', 'intermediate', 2.0);
+    (1, 'Machine Learning', 'advanced', 3.0),
+    (1, 'PostgreSQL', 'advanced', 4.0),
+    (1, 'Flask', 'advanced', 3.5)
+ON CONFLICT (user_id, skill_name) DO NOTHING;
 
 -- Success message
 SELECT 'Schema created successfully! All 8 tables are ready.' AS status;
