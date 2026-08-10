@@ -185,7 +185,7 @@ import importlib.util
 
 spec = importlib.util.spec_from_file_location(
     "ingest_jobs",
-    "/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone/01_ingest_jobs.py"
+    "/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone/mcp_server/01_ingest_jobs.py"
 )
 ingest_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ingest_module)

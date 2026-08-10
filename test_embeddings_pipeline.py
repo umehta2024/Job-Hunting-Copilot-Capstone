@@ -129,7 +129,7 @@ import importlib.util
 
 spec = importlib.util.spec_from_file_location(
     "generate_embeddings",
-    "/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone/02_generate_embeddings.py"
+    "/Workspace/Users/umehta@mitaoe.ac.in/Job-Hunting-Copilot-Capstone/mcp_server/02_generate_embeddings.py"
 )
 embed_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(embed_module)
