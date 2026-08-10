@@ -233,7 +233,13 @@ def get_secret(scope: str, key: str) -> str:
     try:
         secret_bytes = dbutils.secrets.get(scope=scope, key=key)
         try:
-            return base64.b64decode(secret_bytes).decode("utf-8")
+            decoded = base64.b64decode(secret_bytes).decode("utf-8")
+            # Try second decode if first result is still base64 (double-encoded)
+            try:
+                decoded = base64.b64decode(decoded).decode("utf-8")
+            except:
+                pass  # First decode was sufficient
+            return decoded
         except Exception:
             return secret_bytes
     except Exception as e:

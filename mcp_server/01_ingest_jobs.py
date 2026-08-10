@@ -191,7 +191,13 @@ def get_secret(scope: str, key: str) -> str:
         secret_bytes = dbutils.secrets.get(scope=scope, key=key)
         # Try to decode as base64 first (in case setup_secrets.py encoded it)
         try:
-            return base64.b64decode(secret_bytes).decode("utf-8")
+            decoded = base64.b64decode(secret_bytes).decode("utf-8")
+            # Try second decode if first result is still base64 (double-encoded)
+            try:
+                decoded = base64.b64decode(decoded).decode("utf-8")
+            except:
+                pass  # First decode was sufficient
+            return decoded
         except Exception:
             # If decoding fails, return as-is
             return secret_bytes

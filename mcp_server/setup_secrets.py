@@ -14,7 +14,6 @@ as base64-encoded secrets in the `job_hunting` scope. The job hunting app reads 
 these secrets.
 """
 
-import base64
 import getpass
 
 from databricks.sdk import WorkspaceClient

@@ -46,7 +46,14 @@ def get_secret(scope: str, key: str) -> str:
     try:
         secret_value = w.secrets.get_secret(scope=scope, key=key).value
         try:
-            return base64.b64decode(secret_value).decode("utf-8")
+            # Try first decode
+            decoded = base64.b64decode(secret_value).decode("utf-8")
+            # Try second decode if first result is still base64
+            try:
+                decoded = base64.b64decode(decoded).decode("utf-8")
+            except:
+                pass  # First decode was sufficient
+            return decoded
         except:
             return secret_value
     except Exception as e:

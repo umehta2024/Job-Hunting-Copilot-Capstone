@@ -31,7 +31,13 @@ def _lakebase_url() -> str:
     """
     secret = _w.secrets.get_secret(scope=_SCOPE, key=_KEY)
     try:
-        return base64.b64decode(secret.value).decode("utf-8")
+        decoded = base64.b64decode(secret.value).decode("utf-8")
+        # Try second decode if first result is still base64 (double-encoded)
+        try:
+            decoded = base64.b64decode(decoded).decode("utf-8")
+        except:
+            pass  # First decode was sufficient
+        return decoded
     except (ValueError, TypeError):
         # Already-decoded value (e.g. secret set some other way) -- use as-is
         return secret.value
