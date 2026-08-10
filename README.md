@@ -1,15 +1,21 @@
-# Job Hunting Copilot - Semantic Job Search System
+# Job Hunting Copilot - Complete Job Search Management System
 
-A Databricks-powered job search application that enables semantic search over job postings using vector embeddings and pgvector.
+A Databricks-powered job search and application tracking system with semantic search, user profiles, application pipeline management, interview tracking, and networking tools.
 
 ## 🎯 Architecture Overview
 
 This system provides:
 - **Data ingestion** from Adzuna Jobs API
 - **Vector embeddings** for semantic search over job descriptions (384-dim, NO LLM!)
-- **REST API** for searching jobs via natural language
+- **Preference-aware semantic search** - Auto-applies saved user preferences
+- **User profile management** - Skills, bio, location, preferences
+- **Application pipeline tracking** - Applied → Interviewing → Offered → Accepted/Rejected
+- **Interview notes** - Date, type, interviewer, notes with status auto-promotion
+- **Networking contacts** - Track recruiters, hiring managers, and referrals
+- **Stale application detection** - Find apps needing follow-up
+- **REST API** for all operations
 - **Lakebase (Postgres)** storage with pgvector for fast similarity search
-- **Flask web interface** with job cards and filtering
+- **Modern web interface** with job cards, pipelines, and filters
 
 ## ⚡ Quick Start: End-to-End Example
 
@@ -86,6 +92,129 @@ curl -X POST http://localhost:8080/jobs/save \
 ### **Get Saved Jobs**
 ```bash
 curl "http://localhost:8080/jobs/saved?user_id=1"
+```
+
+---
+
+### **User Profile Management**
+
+#### **Create/Update Profile**
+```bash
+curl -X POST http://localhost:8080/profile \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "full_name": "Jane Doe",
+    "location": "London, UK",
+    "phone": "555-123-4567",
+    "linkedin_url": "https://linkedin.com/in/janedoe",
+    "github_url": "https://github.com/janedoe",
+    "bio": "Backend engineer with 5 years Python experience",
+    "preferences": {
+      "preferred_location": "London",
+      "preferred_category": "IT Jobs",
+      "min_salary": 90000,
+      "remote_only": true
+    },
+    "skills": [
+      {"skill_name": "Python", "proficiency_level": "expert", "years_of_experience": 5},
+      {"skill_name": "SQL", "proficiency_level": "advanced", "years_of_experience": 4.5}
+    ]
+  }'
+```
+
+#### **Get Profile**
+```bash
+curl "http://localhost:8080/profile?user_id=1"
+```
+
+---
+
+### **Application Pipeline Tracking**
+
+#### **Create/Update Application**
+```bash
+curl -X POST http://localhost:8080/applications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "job_id": 123,
+    "user_id": 1,
+    "status": "applied",  # applied|interviewing|offered|rejected|accepted|withdrawn
+    "applied_date": "2026-08-01",
+    "notes": "Applied via LinkedIn"
+  }'
+```
+
+#### **List Applications**
+```bash
+# All applications
+curl "http://localhost:8080/applications?user_id=1"
+
+# Filter by status
+curl "http://localhost:8080/applications?user_id=1&status=interviewing"
+```
+
+#### **Get Stale Applications**
+```bash
+# Applications not updated in 14+ days
+curl "http://localhost:8080/applications/stale?user_id=1&days=14"
+```
+
+---
+
+### **Interview Tracking**
+
+#### **Log Interview Note**
+```bash
+curl -X POST http://localhost:8080/interviews \
+  -H "Content-Type: application/json" \
+  -d '{
+    "application_id": 5,
+    "interview_date": "2026-08-12",
+    "interview_type": "technical",  # phone|video|onsite|technical|behavioral
+    "interviewer_name": "Alex Kim",
+    "notes": "System design focus, asked about queueing systems"
+  }'
+```
+
+#### **List Interview Notes**
+```bash
+# All interviews for user
+curl "http://localhost:8080/interviews?user_id=1"
+
+# Interviews for specific application
+curl "http://localhost:8080/interviews?application_id=5"
+```
+
+---
+
+### **Networking Contacts**
+
+#### **Create Contact**
+```bash
+curl -X POST http://localhost:8080/contacts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "name": "Alex Kim",
+    "company": "Tech Corp",
+    "title": "Engineering Manager",
+    "email": "alex@techcorp.com",
+    "linkedin_url": "https://linkedin.com/in/alexkim",
+    "notes": "Met at PyCon, offered to refer me"
+  }'
+```
+
+#### **List Contacts**
+```bash
+# All contacts
+curl "http://localhost:8080/contacts?user_id=1"
+
+# Search by name/company
+curl "http://localhost:8080/contacts?user_id=1&q=Alex"
+
+# Filter by company
+curl "http://localhost:8080/contacts?user_id=1&company=Tech+Corp"
 ```
 
 ## 🗄️ Database Schema
@@ -211,9 +340,11 @@ Job-Hunting-Copilot-Capstone/
 ## 🔒 Security
 
 - All secrets stored in Databricks Secret Scope
-- Lakebase URL base64-encoded
-- OAuth tokens for API authentication
-- No hardcoded credentials
+- Lakebase connection URL stored as plain text (not base64, per Databricks Apps v2 best practices)
+- Postgres connection credentials managed via Lakebase OAuth
+- No hardcoded credentials in code
+- All database operations use parameterized queries (SQL injection prevention)
+- Helper functions (_first_value, _safe_ddl) for robust cursor handling and privilege errors
 
 ## 📈 Future Enhancements
 
