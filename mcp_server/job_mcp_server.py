@@ -286,9 +286,8 @@ def update_application_status(job_id: int, status: str, notes: str = "") -> dict
                     VALUES (%s, %s, %s, %s)
                     ON CONFLICT (user_id, job_id) DO UPDATE SET
                         status = EXCLUDED.status,
-                        notes = EXCLUDED.notes,
-                        updated_at = CURRENT_TIMESTAMP
-                    RETURNING application_id, status, updated_at
+                        notes = EXCLUDED.notes
+                    RETURNING application_id, status, created_at
                 """, (user_id, job_id, status, notes or None))
                 conn.commit()
                 result = cursor.fetchone()
@@ -297,7 +296,7 @@ def update_application_status(job_id: int, status: str, notes: str = "") -> dict
                     "application_id": result['application_id'],
                     "job_id": job_id,
                     "application_status": result['status'],
-                    "updated_at": str(result['updated_at'])
+                    "created_at": str(result['created_at'])
                 }
         finally:
             conn.close()
