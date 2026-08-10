@@ -8,6 +8,7 @@ Deploy as a Databricks App for production use with proper user identity tracking
 Tools:
     - search_jobs(query, location, min_salary, top_k)
     - get_job_details(job_id)
+    - get_user_profile()
     - save_job(job_id, notes)
     - update_application_status(job_id, status, notes)
     - add_interview_note(application_id, interview_date, interview_type, notes)
@@ -172,6 +173,47 @@ def get_job_details(job_id: int) -> dict:
             conn.close()
     except Exception as e:
         logger.exception(f"Failed to get job {job_id}")
+        return {"status": "error", "message": str(e)}
+
+
+@mcp.tool
+def get_user_profile() -> dict:
+    """
+    Get the current user's profile and skills, for ranking job search
+    results against stated preferences and grounding cover letter or
+    resume bullet drafts in real background.
+
+    Returns:
+        Dict with profile fields (full_name, location, bio, preferences)
+        and a list of skills (skill_name, proficiency_level, years_of_experience).
+    """
+    try:
+        user_id = _get_user_id()
+        conn = psycopg2.connect(lakebase_url)
+        try:
+            with conn.cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute("""
+                    SELECT full_name, location, bio, linkedin_url, github_url,
+                           portfolio_url, preferences
+                    FROM profiles WHERE user_id = %s
+                """, (user_id,))
+                profile = cursor.fetchone()
+                if not profile:
+                    return {"status": "not_found", "message": f"No profile found for user_id {user_id}"}
+                profile = dict(profile)
+
+                cursor.execute("""
+                    SELECT skill_name, proficiency_level, years_of_experience
+                    FROM skills WHERE user_id = %s
+                    ORDER BY years_of_experience DESC
+                """, (user_id,))
+                profile["skills"] = [dict(row) for row in cursor.fetchall()]
+
+                return {"status": "success", "profile": profile}
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.exception("Failed to get user profile")
         return {"status": "error", "message": str(e)}
 
 
@@ -368,5 +410,5 @@ if __name__ == "__main__":
     # Run HTTP server (Databricks App or local)
     port = int(os.getenv("DATABRICKS_APP_PORT", os.getenv("PORT", 8000)))
     logger.info(f"🚀 Starting Job Hunting MCP Server on port {port}")
-    logger.info("📦 Tools: search_jobs, get_job_details, save_job, update_application_status, add_interview_note, get_current_user")
+    logger.info("📦 Tools: search_jobs, get_job_details, get_user_profile, save_job, update_application_status, add_interview_note, get_current_user")
     mcp.run(transport="http", host="0.0.0.0", port=port)
